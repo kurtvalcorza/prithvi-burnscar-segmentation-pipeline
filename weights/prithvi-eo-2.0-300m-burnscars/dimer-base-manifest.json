@@ -1,0 +1,60 @@
+{
+  "format": "dimer_hf_snapshot",
+  "formatVersion": 1,
+  "modelKey": "prithvi-eo-2.0-300m-burnscars",
+  "modelId": "ibm-nasa-geospatial/Prithvi-EO-2.0-300M-BurnScars",
+  "revision": "a3f2c410e45b8ac7417976614528a872f024d831",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 3717,
+      "sha256": "714e8139bcdad0b9ea32628f51460fbcaada07085edd9c026a9daa5738fb7532"
+    },
+    {
+      "path": "config.json",
+      "bytes": 3228,
+      "sha256": "a7e2ca5f4555820bfc9ec92a11142a4fefdade7033aa6653965c179a384b115e"
+    },
+    {
+      "path": "burn_scars_config.yaml",
+      "bytes": 2504,
+      "sha256": "9b40e6d8c6369b863d29fb1d69b6185aa366f8ee4c2de955bbad28d3ee32f466"
+    },
+    {
+      "path": "Prithvi_EO_V2_300M_BurnScars.pt",
+      "bytes": 1297798380,
+      "sha256": "0c5f9334be9a75c9006387ab8f3dc05a55ea7fb5ef7956717316be57c62954d3"
+    },
+    {
+      "path": "splits/train.txt",
+      "bytes": 9432,
+      "sha256": "f1dca5c488c7a7451f3aa82f20677c18b3b22a2d96b59d68215494e3dba6f393"
+    },
+    {
+      "path": "splits/val.txt",
+      "bytes": 2880,
+      "sha256": "50a98be7974a2fec73af62b5f54063d938bcfe93cd9802b90eb33eb78f4d7f3e"
+    },
+    {
+      "path": "splits/test.txt",
+      "bytes": 2160,
+      "sha256": "c61ddcb5a434da3f5e63edd7c87549af104c6cc69345876a8ed770844bab1788"
+    },
+    {
+      "path": "examples/subsetted_512x512_HLS.S30.T10SEH.2018190.v1.4_merged.tif",
+      "bytes": 6295168,
+      "sha256": "13bc592a5e569d837bd8bb3524bb0d2f28418830bcc7b0750e74033078f8b17e"
+    },
+    {
+      "path": "examples/subsetted_512x512_HLS.S30.T10SFF.2018190.v1.4_merged.tif",
+      "bytes": 6295168,
+      "sha256": "b491445bcca5d23a534765ac9f8b24f4cb0c9a75a7254c969456d65a982207a5"
+    },
+    {
+      "path": "examples/subsetted_512x512_HLS.S30.T10SGF.2020217.v1.4_merged.tif",
+      "bytes": 6295168,
+      "sha256": "ecaa478fdb21ed437ea03436da87ed5efbd3d980e4da23cbee05171212c40378"
+    }
+  ],
+  "totalBytes": 1316707805
+}
