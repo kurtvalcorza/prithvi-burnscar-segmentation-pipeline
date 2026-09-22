@@ -5,7 +5,7 @@ pipeline_tag: image-segmentation
 task: "Segmentation - Satellite Burn-Scar Mapping (HLS, Prithvi-EO-2.0 fine-tune)"
 base_model: ibm-nasa-geospatial/Prithvi-EO-2.0-300M-BurnScars
 date_published: "2025-02-28"
-date_published_source: "Hugging Face Hub commit `bf9c5cd9` (\"Upload Prithvi_EO_V2_300M_BurnScars.pt\", 2025-02-28) that first published the checkpoint; the pinned revision `a3f2c410…` (2025-09-29, \"Update config.json\") carries the identical checkpoint bytes (SHA-256 `0c5f9334…`). The Prithvi-EO-2.0 preprint (arXiv:2412.02732) is from December 2024; the fleet inventory's `2024-12` names the model family's publication, not this fine-tune's, and is superseded for this row."
+date_published_source: "Hugging Face Hub commit `bf9c5cd9` (\"Upload Prithvi_EO_V2_300M_BurnScars.pt\", 2025-02-28) that first published the checkpoint; the pinned revision `a3f2c410…` (2025-09-29, \"Update config.json\") carries the identical checkpoint bytes (SHA-256 `0c5f9334…`). The Prithvi-EO-2.0 preprint (arXiv:2412.02732) is from December 2024; the previously recorded `2024-12` names the model family's publication, not this fine-tune's, and is superseded for this row."
 ---
 
 # Prithvi-EO-2.0-300M BurnScars — Burn-Scar Segmentation (HLS Scenes & Bounded Decoder Fine-Tuning)
@@ -152,7 +152,7 @@ The model must not be used to direct evacuation, aid, insurance, damage assessme
 
 | Field | Status |
 |---|---|
-| **DIMER status** | **Planned / conditional** — the `.pt` asset-format and deserialization-trust review the fleet inventory requires is what this repository implements; the review's acceptance is Kurt's call |
+| **DIMER status** | **Planned / conditional** — the `.pt` asset-format and deserialization-trust review DIMER requires is what this repository implements; the review's acceptance is the maintainer's call |
 | Licence | Apache-2.0 (weights, the upstream Prithvi-EO-2.0 code, TerraTorch, and this repository's code) — use, modification, redistribution and commercial use permitted with the licence and notices preserved |
 | Weights | Would be redistributed converted, not unmodified: the served artifact is the deterministic safetensors derived from the pinned checkpoint, with both identities recorded (asset spec §11.2); this repository redistributes neither |
 | Remote code | **Not required** — no Hub-hosted module is imported; the model class comes from `terratorch==1.2.13` on PyPI |
