@@ -49,7 +49,7 @@ Two tasks are exposed. **Burn-scar segmentation:** input is a 512 × 512 scene o
 
 ###### Primary Intended Users
 
-Intended users are Earth-observation scientists, wildfire and land-management analysts, and machine-learning engineers who work with HLS or Sentinel-2 scenes, in research, public service or the DIMER model workbench. The pipeline assumes its users understand that the model learned six specific bands at a specific scaling and that band order and reflectance units are part of the contract; that a burned-area label carries its own uncertainty at scar edges, under smoke and over mixed vegetation; that neighbouring scenes of one fire are near-duplicates, so splits must be by fire or tile; that the not-burned baseline is the number to read first on scenes with little burn; and that a 12-scene evaluation is a sanity check, not a measurement of skill.
+Intended users are Earth-observation scientists, wildfire and land-management analysts, and machine-learning engineers who work with HLS or Sentinel-2 scenes, in research or public service. The pipeline assumes its users understand that the model learned six specific bands at a specific scaling and that band order and reflectance units are part of the contract; that a burned-area label carries its own uncertainty at scar edges, under smoke and over mixed vegetation; that neighbouring scenes of one fire are near-duplicates, so splits must be by fire or tile; that the not-burned baseline is the number to read first on scenes with little burn; and that a 12-scene evaluation is a sanity check, not a measurement of skill.
 
 ###### Out-of-scope use cases
 
