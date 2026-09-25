@@ -32,7 +32,7 @@ masks = pipe.predict(splits["test"][:2])["predictions"]
 pipe.save_artifact("outputs/adapter")
 ```
 
-`predict()`, `evaluate()` and `adapt()` take records — `{id, image, label}` with a (6, 512, 512) reflectance array (or a GeoTIFF path; 13-band Sentinel-2 L1C files are reduced to the six HLS-equivalent bands) and a (512, 512) mask with 0 / 1 / −1. HLS scenes are already reflectance in [0, 1]; values above 1 are scaled by 10⁻⁴, no-data (0 or −9999) is replaced by 0, and validation is structural: nothing checks that the bands are the right six in the right order or that the reflectance is corrected.
+`predict()`, `evaluate()` and `adapt()` take records — `{id, image, label}` with a (6, 512, 512) reflectance array (or a GeoTIFF path; 13-band Sentinel-2 L1C files are reduced to the six HLS-equivalent bands) and a (512, 512) mask with 0 / 1 / −1. HLS scenes are already reflectance in [0, 1]; values above 2 are read as reflectance × 10 000 and scaled by 10⁻⁴ (once: a checked record is never rescaled), no-data (0 or −9999) is replaced by 0, and validation is structural: nothing checks that the bands are the right six in the right order or that the reflectance is corrected.
 
 ## Weights layout
 
@@ -70,7 +70,7 @@ Tests are offline: crafted pickles, temporary manifests, synthetic scenes, a syn
 
 ## Release status
 
-**Release-grade** — the `E2E` notebook blob `ce608523` (committed at `e2fb8b0`) executed top-to-bottom in a clean Kaggle Tesla T4 runtime on 2026-09-19 (10/10 ok (1 restart after install cell), 358.0 s); the record is in `docs/release-verification.md` and `STATUS.md`. Static and unit checks — including the standalone generator parity checks — are necessary but were never the evidence; the hosted run is. A later change to the carried modules or the notebook returns the status to Candidate until re-verified.
+**Release-grade** — the `E2E` notebook blob `d8aa27bf` (committed at `f5d329c`) executed top-to-bottom in a clean Kaggle Tesla T4 runtime on 2026-09-25 (10/10 ok (1 restart after install cell), 430.8 s); the record is in `docs/release-verification.md` and `STATUS.md`. Static and unit checks — including the standalone generator parity checks — are necessary but were never the evidence; the hosted run is. A later change to the carried modules or the notebook returns the status to Candidate until re-verified.
 
 ## Licensing
 
