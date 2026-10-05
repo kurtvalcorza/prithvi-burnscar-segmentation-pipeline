@@ -45,9 +45,24 @@ TEMPLATE = {
     "notebook_name": "prithvi_burnscar_segmentation_colab.ipynb",
     "profile": "E2E",
     "mode": "GUIDED",
+    # SWP-R (2026-10-05 fleet sweep): nothing is pip-installed into the notebook kernel. The fleet's uv isolated-environment
+    # mechanism (build_notebook.py/2.2): managed CPython, a size- and SHA-256-verified uv wheel, and a lock compiled from the
+    # pyproject pins with `uv pip compile pyproject.toml --python-version 3.12 --python-platform x86_64-manylinux_2_28
+    # --generate-hashes --only-binary :all: -o tutorials/requirements-colab.lock.txt` (uv 0.12.15).
+    "isolated_runtime": True,
+    "infrastructure_labels": True,
+    "managed_python": "3.12.12",
+    "uv": {
+        "version": "0.12.15",
+        "url": "https://files.pythonhosted.org/packages/1e/fd/432451d732917c49152a291de3ef171aa6b0f1a22d39780fb2c1f085ca4c/uv-0.12.15-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+        "bytes": 20081404,
+        "sha256": "aee9802f46bae436bd91751bb33ddeb379ef1596b5c19df193219d545d244b60",
+    },
+    "lock": "tutorials/requirements-colab.lock.txt",
     "run_all": (
-        "Selecting **Run all** in a fresh **GPU** runtime installs the pinned dependencies (torch, torchvision, terratorch and its "
-        "stack, tifffile, numpy, safetensors, huggingface-hub), stages and digest-verifies the pinned Prithvi burn-scar checkpoint "
+        "Selecting **Run all** in a fresh **GPU** runtime builds an isolated environment from the hash-locked pins (torch, torchvision, "
+        "terratorch and its stack, tifffile, numpy, safetensors, huggingface-hub); nothing is installed into the notebook's own Python, so "
+        "no restart is needed and Run all completes in one pass. It then stages and digest-verifies the pinned Prithvi burn-scar checkpoint "
         "(1.30 GB) from the Hub, statically audits the Lightning pickle against an allow-list, converts it once into safetensors "
         "with a pinned digest, rebuilds the architecture from the installed `terratorch` package and loads it strictly, fetches the "
         "digest-pinned HLS Burn Scars tarball (2.6 GB, no credential) and extracts exactly the 44 pinned scenes and masks, validates "
@@ -56,12 +71,13 @@ TEMPLATE = {
         "head, scores the same scenes again, segments the three example scenes shipped with the upstream repository, exports the "
         "adapter as safetensors with a manifest, and reloads that artifact into a fresh pipeline to verify prediction parity. The "
         "default path needs no repository clone, no DIMER worker or service, no credential, no upload dialog and no configuration "
-        "edit (NOTEBOOK_SPEC 2.0 §5). On a T4 the whole path takes a few minutes of model time after the downloads; the "
-        "terratorch install and the tarball are the slowest steps."
+        "edit (NOTEBOOK_SPEC 2.0 §5). On a T4 the whole path takes a few minutes of model time after the downloads; building "
+        "the isolated environment and the tarball are the slowest steps."
     ),
     "byod": (
         "After the tutorial workflow completes, set `USE_BYOD = True` in Section 4 and re-run from that cell to supply your own "
-        "labelled scenes as a zip holding `pairs.csv` (columns `id`, `image`, `label`) beside six-band 512 × 512 GeoTIFF chips "
+        "labelled scenes — as `BYOD_PATH` (a path in the runtime, which works on Colab, Kaggle and Jupyter) or, when it is empty, through "
+        "the Colab upload dialog — as a zip (or folder) holding `pairs.csv` (columns `id`, `image`, `label`) beside six-band 512 × 512 GeoTIFF chips "
         "(blue, green, red, narrow NIR, SWIR 1, SWIR 2 — surface reflectance in [0, 1] or × 10 000) and single-band label rasters "
         "(0 = not burned, 1 = burn scar, −1 = no data); at least four chips with some burn scar. Your chips are split by seed into "
         "training, validation and test sets and flow through the same contract — validation, frozen baseline, adaptation, "
@@ -69,6 +85,31 @@ TEMPLATE = {
         "guidance are stated in the Prerequisites and in Section 4, and uploaded files stay inside this runtime. BYOD is optional "
         "and never part of the default path."
     ),
+    "guided": {
+        "opening": [
+            '**Who this notebook is for.** The intended audience is a learner who knows basic Python, has used Colab or Jupyter, and wants to see how a geospatial '
+            'foundation model fine-tuned for one task is evaluated and adapted honestly: how its burn-scar maps are scored against a baseline that predicts *not '
+            'burned* everywhere, what a bounded fine-tuning of the decoder does to a model that already trained on this dataset, and how the change is exported and '
+            'reloaded. No prior experience with Prithvi, TerraTorch or remote sensing models is assumed; terms are explained where they first matter and again in '
+            'the **Glossary** at the end. A GPU runtime (T4 or better) is expected.\n\n**Input → Model → Output.**\n\n| | Segmentation | Bounded fine-tuning |\n|---|---|---|\n| '
+            'Input | six-band 512 × 512 HLS reflectance chips (blue, green, red, narrow NIR, SWIR 1, SWIR 2) | labelled chips with 0 / 1 / −1 masks (24 training, 8 '
+            'validation, 12 test in the sample) |\n| Model | the Prithvi-EO-2.0 ViT-L encoder, pyramid neck, U-Net decoder and two-class head, loaded from audited, '
+            'converted safetensors | the same model; only the neck, decoder and head (20.3 M parameters) are trained, the encoder and BatchNorm statistics stay '
+            "frozen |\n| Output | a per-pixel burn-scar mask, softmax scores, burn fraction; pixel IoU / F1 beside the not-burned baseline | the adapted model's "
+            "numbers beside the frozen model's on the same held-out scenes, and an 81 MB safetensors adapter that reloads with parity |\n\n**How to use this "
+            'notebook.** Choose a GPU runtime (**Runtime → Change runtime type → T4 GPU**), then **Runtime → Run all**. Run all completes in one pass: Section 1 '
+            "installs nothing into the notebook's own Python, so no restart is needed. Sections 1–3 are **infrastructure** — the isolated environment, the carried "
+            'package and the audited model snapshot — and their cells are collapsed; you may run them without studying them. The learning path starts in Section 4. '
+            'Form fields (`# @param`) are the only values meant to be edited, and the defaults reproduce the recorded run. Before each principal result the '
+            'notebook asks you to **Predict**; after it come **What to notice** and a collapsible **Check your reasoning** with a worked answer from the recorded '
+            'run (the Kaggle Tesla T4 run of 25 September 2026 recorded in `docs/release-verification.md`). Every adaptation starts from the pinned base, so '
+            're-running Section 6 with other settings is a fresh experiment. **Troubleshooting**, a **Glossary** and a **Conclusion** template are at the end. '
+            'Writing your predictions down is optional.\n\n**Roadmap:** 1–3 infrastructure → 4 the labelled scenes, validation and refusals *(evaluation practice)* → '
+            '5 the frozen model against the not-burned baseline *(core concept)* → 6 bounded fine-tuning of the neck, decoder and head *(core concept)* → 7 the '
+            'held-out paired comparison *(evaluation practice)* → 8 new scenes, export and fresh reload *(engineering)* → interpretation, troubleshooting, glossary '
+            'and your conclusion.'
+        ],
+    },
     "pipeline_class": "PrithviBurnScarPipeline",
     "model_load": "PrithviBurnScarPipeline.from_pretrained(weights_dir=WEIGHTS_DIR, device=('cuda' if torch.cuda.is_available() else 'cpu'), report=print)",
     "weights_key": "prithvi-eo-2.0-300m-burnscars",
@@ -108,10 +149,10 @@ TEMPLATE = {
         "44-scene sample stands in for an operational evaluation. The repository exposes none of these."
     ),
     "prerequisites": [
-        "- **Runtime:** a fresh supported **GPU** runtime (Google Colab T4 or better, or a Jupyter kernel with a CUDA GPU and Python 3.12): the ViT-L encoder runs in float16 autocast and the default adaptation needs about 2.5 GB of GPU memory; on CPU one 512 × 512 scene takes tens of seconds and the adaptation would take an hour. About 6 GB of disk is needed for the checkpoint, its conversion and the tarball; the `terratorch` install pulls torchgeo, lightning and their dependencies and takes several minutes.",
+        "- **Runtime:** a fresh supported **GPU** runtime (Google Colab T4 or better, or a Jupyter kernel with a CUDA GPU and Python 3.12): the ViT-L encoder runs in float16 autocast and the default adaptation needs about 2.5 GB of GPU memory; on CPU one 512 × 512 scene takes tens of seconds and the adaptation would take an hour. About 6 GB of disk is needed for the checkpoint, its conversion and the tarball; building the isolated environment (terratorch pulls torchgeo, lightning and their dependencies) takes several minutes the first time and is reused on a re-run.",
         "- **Knowledge:** what a multispectral surface-reflectance scene is (bands, scaling, no-data), what a pixel-wise segmentation mask and an ignore class are, and how IoU, precision and recall are read against a majority baseline.",
         "- **Executable serialization handled explicitly:** the pinned checkpoint is a pickle. It is digest-verified, statically audited against an allow-list (audit digest pinned) and unpickled **once** through torch's weights-only loader to produce the safetensors the model is actually loaded from. No Hub-hosted Python module is imported; `terratorch` is installed from PyPI at a pinned version.",
-        "- **Data contract:** a record is `{{id, image, label}}` — a (6, 512, 512) reflectance array (or a GeoTIFF; 13-band Sentinel-2 L1C files are reduced to the six HLS-equivalent bands) with values in [0, 1] or × 10 000, no-data 0 or −9999, and a (512, 512) mask with 0 / 1 / −1. Validation is structural: nothing checks that the bands are the right six in the right order, that the reflectance is corrected, or that the label belongs to the scene.",
+        "- **Data contract:** a record is `{id, image, label}` — a (6, 512, 512) reflectance array (or a GeoTIFF; 13-band Sentinel-2 L1C files are reduced to the six HLS-equivalent bands) with values in [0, 1] or × 10 000, no-data 0 or −9999, and a (512, 512) mask with 0 / 1 / −1. Validation is structural: nothing checks that the bands are the right six in the right order, that the reflectance is corrected, or that the label belongs to the scene.",
         "- **Privacy:** Do not upload confidential or restricted data to a hosted runtime unless you are authorized to process it there — commercial imagery under licence or unreleased fire-damage assessments are exactly that. The default path uploads nothing.",
         "- **External access (data):** besides the model snapshot, the default path fetches one pinned object — the 2.6 GB `hls_burn_scars.tar.gz` of the Hugging Face dataset `ibm-nasa-geospatial/hls_burn_scars` at an immutable revision — over HTTPS, digest-verified before any member is read; the dataset is CC BY 4.0 (NASA IMPACT / University of Alabama in Huntsville).",
     ],
@@ -130,22 +171,39 @@ TEMPLATE = {
                 "Look for: 24 / 8 / 12 scenes with burn fractions around 0.12..0.21, tile ids (UTM zone and grid square) per "
                 "split, a written sample pair (`outputs/{stem}_sample_chip.tif` + `_sample_label.tif`, the BYOD shape), and three "
                 "refusal probes — a five-band scene, a mask with an unknown class, a scene with reflectance far outside range — "
-                "each rejected before the model runs. The tarball takes about a minute to fetch and a minute to stream."
+                "each rejected before the model runs. The tarball takes about a minute to fetch and a minute to stream.\n\n"
+                "*Evaluation practice.* **Predict before running:** about one pixel in six is burned in these scenes. What accuracy will a "
+                "model get that never predicts a burn?"
             ),
             "code": (
                 "import json\n"
                 "import os\n"
                 "from pathlib import Path\n\n"
                 "import numpy as np\n\n"
-                "USE_BYOD = False  # @param {{type:\"boolean\"}}\n\n"
+                "USE_BYOD = False  # @param {{type:\"boolean\"}}\n"
+                "# A .zip or a folder already in the runtime (works on Colab, Kaggle and Jupyter); empty = the Colab upload dialog.\n"
+                "BYOD_PATH = ''  # @param {{type:\"string\"}}\n\n"
                 "os.makedirs('outputs', exist_ok=True)\n"
                 "if USE_BYOD:\n"
-                "    from google.colab import files\n"
-                "    uploaded = files.upload()\n"
-                "    file_name, payload = next(iter(uploaded.items()))\n"
-                "    byod_path = Path('work') / file_name\n"
-                "    byod_path.parent.mkdir(parents=True, exist_ok=True)\n"
-                "    byod_path.write_bytes(payload)\n"
+                "    if BYOD_PATH.strip():\n"
+                "        byod_path = Path(BYOD_PATH.strip()).expanduser()\n"
+                "        if not byod_path.exists():\n"
+                "            raise FileNotFoundError(f'BYOD_PATH {{BYOD_PATH!r}} does not exist (relative paths start at {{Path.cwd()}}): give a .zip or a folder holding pairs.csv and the GeoTIFF files.')\n"
+                "        file_name = byod_path.name\n"
+                "    else:\n"
+                "        try:\n"
+                "            from google.colab import files\n"
+                "        except ImportError:\n"
+                "            raise RuntimeError('USE_BYOD is True but BYOD_PATH is empty, and the upload dialog exists only in Google Colab: on Kaggle or Jupyter put the zip (or folder) in the runtime and set BYOD_PATH to its path.') from None\n"
+                "        uploaded = files.upload() or {{}}\n"
+                "        if len(uploaded) != 1:\n"
+                "            raise ValueError(f'Upload exactly one .zip file (received {{len(uploaded)}}; a cancelled dialog sends none): run this cell again.')\n"
+                "        file_name, payload = next(iter(uploaded.items()))\n"
+                "        if not file_name.lower().endswith('.zip'):\n"
+                "            raise ValueError(f'{{file_name}}: upload one .zip holding pairs.csv and the GeoTIFF files.')\n"
+                "        byod_path = Path('work') / file_name\n"
+                "        byod_path.parent.mkdir(parents=True, exist_ok=True)\n"
+                "        byod_path.write_bytes(payload)\n"
                 "    splits = split_dataset(load_byod_dataset(byod_path), seed=0)\n"
                 "    data_source = 'BYOD (' + file_name + ')'\n"
                 "else:\n"
@@ -175,6 +233,15 @@ TEMPLATE = {
         },
         {
             "md": (
+                '**What to notice:** the split sizes, `burn_fraction` and `ignored_pixels` per split, the tile ids, and the three refusals.\n\n<details><summary>Check '
+                'your reasoning</summary>Roughly 80 %. In the recorded run the not-burned baseline scored accuracy 0.7869 on the test pixels with a burn-scar IoU of 0 '
+                '— high accuracy for doing nothing, which is why the burn-scar IoU, precision and recall are the numbers to read. No-data pixels (−1) are excluded from '
+                'every count rather than treated as unburned. The refusals (five bands, an unknown label class, reflectance far out of range) stop before any model '
+                'call and name the rule. Note what validation cannot catch: six bands in the wrong order.</details>'
+            ),
+        },
+        {
+            "md": (
                 "## 5. The frozen model against the not-burned baseline\n\n"
                 "`pipe.predict` standardises each scene with the band statistics of the upstream training configuration, runs the "
                 "encoder, neck, decoder and head in float16 autocast, and returns the argmax mask, the softmax scores (the model's "
@@ -184,11 +251,20 @@ TEMPLATE = {
                 "as unburned — is scored on the same pixels, so its accuracy is exactly the unburned fraction and its burn IoU is 0.\n\n"
                 "Look for: a burn-scar IoU above 0.9 on the test scenes (in the build record 0.925 with F1 0.961 — this fine-tune is "
                 "strong on its own test split, from which these scenes were drawn) and a lower validation IoU (about 0.76: a few "
-                "validation scenes are hard). These are sample-sanity numbers on 12 and 8 scenes, not the benchmark."
+                "validation scenes are hard). These are sample-sanity numbers on 12 and 8 scenes, not the benchmark. If you re-run this "
+                "cell after Section 6, it first puts the adapted tensors back to the pinned base, so *frozen* always means the packaged "
+                "model.\n\n"
+                "**Predict before running:** the packaged model was fine-tuned on this dataset's training split. How close to perfect "
+                "will its test-scene burn-scar IoU be, and will validation be easier or harder?"
             ),
             "code": (
                 "import time\n\n"
                 "t0 = time.perf_counter()\n"
+                "# SWP-F: the frozen numbers are always the pinned base. On a re-run after Section 6 the adapted tensors are put back\n"
+                "# to the base first (then re-run Sections 6-8 in order); adapt() itself also starts from the base on every call.\n"
+                "restored_tensors = pipe.restore_base()\n"
+                "if restored_tensors:\n"
+                "    print({{'restored_pinned_base': len(restored_tensors), 'note': 'adapted tensors put back to the pinned base; re-run Sections 6-8 in order'}})\n"
                 "frozen_test = pipe.evaluate(test_records)\n"
                 "frozen_val = pipe.evaluate(val_records)\n"
                 "print({{'seconds': round(time.perf_counter() - t0, 1), 'metric': frozen_test['metric']}})\n"
@@ -204,6 +280,14 @@ TEMPLATE = {
         },
         {
             "md": (
+                '**What to notice:** `baseline_not_burned_test` beside `frozen_test`, precision against recall, the validation IoU, and the per-scene burn fractions.\n\n<details><summary>Check '
+                'your reasoning</summary>Close, not perfect. In the recorded run the frozen test burn-scar IoU was 0.9251 (F1 0.9611, accuracy 0.9833 against the '
+                "baseline's 0.7869), while validation was clearly harder at 0.7627 — a few validation scenes have ambiguous scar edges. The scores are softmax outputs, "
+                'not calibrated probabilities; the mask is their argmax.</details>'
+            ),
+        },
+        {
+            "md": (
                 "## 6. Bounded fine-tuning of the neck, decoder and head\n\n"
                 "`pipe.adapt` trains the 34 tensors of the pyramid neck, the U-Net decoder and the head (20.3 M parameters — 6.3 % of "
                 "the model) and nothing else: the ViT-L encoder is frozen (no gradient is stored for it), and every BatchNorm layer "
@@ -215,7 +299,11 @@ TEMPLATE = {
                 "Watch the validation loss: in the build record it dipped at epoch 1 and drifted up afterwards — the sign that a "
                 "small learning rate and validation selection are doing their job on a model that has little left to learn from "
                 "24 scenes of a dataset it trained on. Four epochs (48 steps) take under a minute on a T4. "
-                "`TRAINABLE = 'decoder+last_block'` also unfreezes the last encoder block (32.9 M parameters)."
+                "`TRAINABLE = 'decoder+last_block'` also unfreezes the last encoder block (32.9 M parameters). Every call starts "
+                "from the pinned base (`started_from` in the printed result), so a re-run with other settings is a fresh experiment, "
+                "not continued training, and epoch 0 is always the frozen model.\n\n"
+                "**Predict before running:** the model has already seen these 24 training scenes' dataset. Will validation loss improve "
+                "at all, and if so, at which epoch?"
             ),
             "code": (
                 "EPOCHS = 4  # @param {{type:\"integer\"}}\n"
@@ -238,15 +326,25 @@ TEMPLATE = {
         },
         {
             "md": (
+                '**What to notice:** epoch 0 (`note: frozen model`), the validation loss per epoch, `best_epoch`, and the trainable share of the parameters.\n\n<details><summary>Check '
+                'your reasoning</summary>A little, once. In the recorded run validation loss went from 0.1072 (frozen) to 0.0984 at epoch 1 and then drifted up, so '
+                'epoch 1 was kept (validation burn-scar IoU 0.7627 → 0.7701). A small learning rate and validation-loss selection keep a model with little left to '
+                'learn from getting worse; with a larger rate the frozen model (epoch 0) would win.</details>'
+            ),
+        },
+        {
+            "md": (
                 "## 7. Held-out evaluation: the paired comparison\n\n"
                 "The test scenes were never used for training or epoch selection (they come from the model repository's test "
                 "split). The adapted model is scored exactly as the frozen model was in Section 5, and the table puts the baseline, "
-                "the frozen and the adapted numbers side by side. The cell asserts what the procedure guarantees — the kept epoch's "
-                "validation loss is no higher than the frozen model's, and re-scoring the validation scenes reproduces the kept "
-                "epoch's burn-scar IoU within 0.01 (float16 kernels are not bit-reproducible across batch sizes) — and prints the "
-                "test numbers without asserting a direction: on this sample the burn-scar IoU moved from 0.925 to 0.926 in the "
+                "the frozen and the adapted numbers side by side. The cell stops only on what the procedure guarantees — the kept "
+                "epoch's validation loss is no higher than the frozen model's (epoch 0 is a candidate), and re-scoring the validation "
+                "scenes reproduces the kept epoch's burn-scar IoU within 0.01 (float16 kernels are not bit-reproducible across batch "
+                "sizes) — and records the test direction as a **verdict** (`improved`, `no change` or `worse`) instead of asserting one: on this sample the burn-scar IoU moved from 0.925 to 0.926 in the "
                 "build record, a sample-sanity observation on 12 scenes with no dispersion estimate, not a quality claim. With your "
-                "own scenes from another region or year, the gap between frozen and adapted is the number to watch."
+                "own scenes from another region or year, the gap between frozen and adapted is the number to watch.\n\n"
+                "*Evaluation practice.* **Predict before running:** after fine-tuning on 24 scenes, will the test burn-scar IoU move by "
+                "more than 0.01?"
             ),
             "code": (
                 "adapted_test = pipe.evaluate(test_records)\n"
@@ -257,6 +355,10 @@ TEMPLATE = {
                 "comparison['burn_iou'] = {{'baseline_not_burned': frozen_test['baseline_not_burned']['iou']['burn scar'], 'frozen': frozen_test['model']['iou']['burn scar'], 'adapted': adapted_test['model']['iou']['burn scar']}}\n"
                 "for key, row in comparison.items():\n"
                 "    print({{key: row}})\n"
+                "delta_burn_iou = adapted_test['model']['iou'][CLASS_NAMES[1]] - frozen_test['model']['iou'][CLASS_NAMES[1]]\n"
+                "# SWP-A: the direction is a recorded verdict, never an assert, so a BYOD run always reaches export and result.json.\n"
+                "comparison['verdict'] = {{'adapted_vs_frozen_burn_iou': 'improved' if delta_burn_iou > 0 else ('no change' if delta_burn_iou == 0 else 'worse'), 'delta': round(delta_burn_iou, 4)}}\n"
+                "print({{'verdict': comparison['verdict']}})\n"
                 "print({{'validation_burn_iou': {{'frozen': frozen_val['model']['iou']['burn scar'], 'adapted': adapted_val['model']['iou']['burn scar']}}, 'validation_loss': {{'frozen': adapt_result['history'][0]['val_loss'], 'kept_epoch': adapt_result['history'][adapt_result['best_epoch']]['val_loss']}}}})\n"
                 "evaluation_report = {{\n"
                 "    'model': {{'id': MODEL_ID, 'revision': MODEL_REVISION, 'key': MODEL_KEY}},\n"
@@ -271,9 +373,20 @@ TEMPLATE = {
                 "}}\n"
                 "with open('outputs/{stem}_evaluation_report.json', 'w', encoding='utf-8') as f:\n"
                 "    json.dump(evaluation_report, f, indent=2)\n"
-                "assert adapt_result['history'][adapt_result['best_epoch']]['val_loss'] <= adapt_result['history'][0]['val_loss']\n"
-                "assert abs(adapted_val['model']['iou'][CLASS_NAMES[1]] - adapt_result['history'][adapt_result['best_epoch']]['val']['iou'][CLASS_NAMES[1]]) < 1e-2\n"
+                "# Contract integrity (not model quality): epoch 0 is a selection candidate, and re-scoring reproduces the kept epoch.\n"
+                "if adapt_result['history'][adapt_result['best_epoch']]['val_loss'] > adapt_result['history'][0]['val_loss']:\n"
+                "    raise RuntimeError('contract: the kept epoch has a higher validation loss than the frozen model, which epoch selection cannot produce')\n"
+                "if abs(adapted_val['model']['iou'][CLASS_NAMES[1]] - adapt_result['history'][adapt_result['best_epoch']]['val']['iou'][CLASS_NAMES[1]]) >= 1e-2:\n"
+                "    raise RuntimeError('contract: re-scoring the validation scenes does not reproduce the kept epoch')\n"
                 "print({{'report': 'outputs/{stem}_evaluation_report.json'}})"
+            ),
+        },
+        {
+            "md": (
+                '**What to notice:** the `burn_iou` row (baseline, frozen, adapted), `accuracy`, and the `verdict` line with its `delta`.\n\n<details><summary>Check your '
+                'reasoning</summary>No. In the recorded run the test burn-scar IoU moved from 0.9251 to 0.9263 (F1 0.9611 → 0.9618, accuracy 0.9833 → 0.9839): the '
+                'verdict was *improved* by about 0.001, far inside what one seed and 12 scenes can resolve. Read it as *the contract ran and did no harm*, not as a '
+                'gain. On scenes from another region or year the same delta is the number that matters.</details>'
             ),
         },
         {
@@ -291,6 +404,7 @@ TEMPLATE = {
                 "(VER4: float16 tolerances; on one device they are usually identical)."
             ),
             "code": (
+                "import importlib.metadata\n"
                 "import platform\n"
                 "import shutil\n\n"
                 "import tifffile\n\n"
@@ -332,6 +446,7 @@ TEMPLATE = {
                 "    'runtime': {{'python': platform.python_version(), 'torch': torch.__version__, 'timm': timm.__version__, 'lightning': lightning.__version__, 'tifffile': tifffile.__version__, 'terratorch': importlib.metadata.version('terratorch')}},\n"
                 "    'data_source': data_source,\n"
                 "    'comparison': comparison,\n"
+                "    'verdict': comparison['verdict'],\n"
                 "    'artifact': {{'dir': str(artifact_dir), 'sha256': artifact_manifest['files'][0]['sha256'], 'bytes': artifact_manifest['files'][0]['bytes']}},\n"
                 "    'reload_parity': parity,\n"
                 "}}\n"
@@ -341,6 +456,14 @@ TEMPLATE = {
                 "for path in sorted(Path('outputs').rglob('*')):\n"
                 "    if path.is_file():\n"
                 "        print(f'  - {{path.as_posix()}} ({{path.stat().st_size / 1024:.1f}} KB)')"
+            ),
+        },
+        {
+            "md": (
+                "**What to notice:** the burn fraction of the three unlabelled example scenes, the artifact's size and tensor count, and `reload_parity`.\n\n<details><summary>Check "
+                'your reasoning</summary>The example scenes carry no labels, so their burn fractions are a sanity check only. In the recorded run the adapter (34 '
+                'tensors, about 81 MB) reloaded into a fresh pipeline with identical held-out metrics (`positive_iou_diff` 0.0, `metrics_identical` True, '
+                '`max_abs_score_diff` 0.0): the adapter plus the pinned, re-verified base is the whole adapted model.</details>'
             ),
         },
     ],
@@ -373,6 +496,40 @@ TEMPLATE = {
         "**Optional experiments (they do not affect the default path):** set `TRAINABLE = 'decoder+last_block'`; raise "
         "`EPOCHS` and watch the validation loss drift; try `LEARNING_RATE = 1e-4` to see the frozen model win every epoch; or "
         "bring your own labelled scenes through BYOD and read the baseline before the adapted number.\n\n"
+        '## Troubleshooting\n\n- **Section 1 stops with "This notebook needs a Linux x86_64 runtime"** — you are on Windows, macOS or an ARM machine. Use Google '
+        'Colab, Kaggle or a Linux x86_64 Jupyter server.\n- **The uv wheel fails its size/SHA-256 check, or a download in Section 1 times out** — run Section 1 '
+        'again; a complete environment built from the same lock is reused, an incomplete one is finished. If it repeats, the network is blocking or altering '
+        '`files.pythonhosted.org` or `pypi.org`.\n- **"The isolated environment\'s Python process exited"** — usually out of memory. Restart the session and '
+        'choose **Run all**.\n- **You re-ran Section 1 on its own** — nothing is lost: it keeps the running worker and every variable, so the cells after it '
+        'keep working. After a session restart, run from the top.\n- **Section 3 reports a size or SHA-256 mismatch, or cannot reach the Hub** — the message '
+        'names the file. Delete it from the snapshot folder Section 3 prints and run Section 3 again.\n- **Section 3 stops during the pickle audit or '
+        'conversion** — the audit refuses any global outside the allow-list and names it; the downloaded checkpoint is not the pinned one. Delete the snapshot '
+        "folder and run Section 3 again.\n- **Section 4 stops on the tarball's size or SHA-256** — the 2.6 GB download was cut short or altered. Run Section 4 "
+        'again: a truncated download is fetched again, and scenes already extracted and verified are reused. If the digest still fails, delete '
+        '`weights/hls-burn-scars/` and run it once more.\n- **CUDA out of memory in Section 6** — another notebook holds the GPU, or `TRAINABLE = '
+        "'decoder+last_block'` with a larger `BATCH_SIZE` exceeds a T4. Restart the session, keep `BATCH_SIZE = 2`, and choose **Run all**.\n- **Section 5 "
+        'prints `restored_pinned_base`** — you re-ran it after Section 6; the adapted tensors were put back to the base. Re-run Sections 6–8 in order.\n- '
+        '**BYOD: a band, shape or label refusal** — the message names the rule; chips must be six-band 512 × 512 GeoTIFFs in the documented band order with '
+        'masks of 0 / 1 / −1, and at least four chips need some burn scar.\n- **BYOD: "BYOD_PATH … does not exist"** — the path is relative to the working '
+        'directory printed in the message.\n- **BYOD: "the upload dialog exists only in Google Colab"** — on Kaggle or Jupyter, put the zip (or folder) in the '
+        'runtime and set `BYOD_PATH` to its path.\n- **BYOD: "Upload exactly one .zip file"** — the dialog was cancelled or several files were chosen; run the '
+        "cell again.\n\n## Glossary\n\n- **HLS (Harmonized Landsat Sentinel-2):** NASA's surface-reflectance product that puts Landsat 8/9 and Sentinel-2 on one 30 "
+        'm grid; the six bands here are blue, green, red, narrow NIR, SWIR 1 and SWIR 2.\n- **Surface reflectance:** the fraction of sunlight a surface reflects '
+        'in a band, after atmospheric correction; stored in [0, 1] or × 10 000.\n- **Burn scar:** ground whose vegetation was removed or charred by fire; it '
+        'darkens NIR and brightens SWIR, which is what the model keys on.\n- **Segmentation mask / ignore class:** one class per pixel; −1 marks no-data pixels '
+        'that are excluded from training and scoring.\n- **Not-burned baseline:** predicting *not burned* for every pixel; its accuracy equals the unburned '
+        'fraction and its burn-scar IoU is 0.\n- **IoU, precision, recall, F1:** overlap of predicted and true burn pixels; the share of predicted burn that is '
+        'real; the share of real burn found; their harmonic mean.\n- **Encoder, neck, decoder, head:** the ViT-L backbone that turns patches into features; the '
+        'pyramid that rescales them; the U-Net that upsamples them to pixels; the final two-class layer.\n- **Frozen / adapted:** the packaged model as '
+        'downloaded / after Section 6 trained the neck, decoder and head.\n- **Pinned base:** the verified packaged weights; every adaptation starts from them (`restore_base`).\n- '
+        '**BatchNorm statistics:** running means and variances inside the decoder; kept fixed because two-scene batches would corrupt them.\n- **Validation-loss '
+        'selection:** keeping the epoch with the lowest validation loss, with the frozen model as epoch 0.\n- **Pickle audit / safetensors:** the upstream '
+        'checkpoint is a pickle that could run code when loaded; it is statically checked against an allow-list and converted once to safetensors, a format '
+        'that stores only tensors.\n- **Isolated environment:** the separate Python environment Section 1 builds from the hash lock; every later cell runs there.\n\n## '
+        "Conclusion (your notes)\n\nComplete these in your own words; the recorded run's values are in the **Check your reasoning** answers above.\n\n- The frozen "
+        "model's test burn-scar IoU was ___ against the not-burned baseline's ___.\n- Bounded fine-tuning moved it to ___ (verdict: ___), which I read as ___.\n- "
+        'The number I would not trust on its own is ___, because ___.\n- Before adapting on my own scenes I would check the band order and scaling, split by '
+        '___, and compare against ___.\n\n'
         "## References\n\n"
         "- Repository README: https://github.com/kurtvalcorza/prithvi-burnscar-segmentation-pipeline/blob/main/README.md\n"
         "- Repository model card: https://github.com/kurtvalcorza/prithvi-burnscar-segmentation-pipeline/blob/main/MODEL_CARD.md\n"
