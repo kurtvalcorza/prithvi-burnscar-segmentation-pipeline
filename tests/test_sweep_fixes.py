@@ -18,6 +18,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from prithvi_burnscar_segmentation_pipeline import false_colour_composite, per_chip_burn_iou
 from prithvi_burnscar_segmentation_pipeline import pipeline as pl
 from prithvi_burnscar_segmentation_pipeline.pipeline import PrithviBurnScarPipeline as PIPELINE_CLASS
 
@@ -161,11 +162,24 @@ def _metrics(burn_iou: float) -> dict:
 
 
 def _section_7_namespace(adapted_iou: float, kept_val_loss: float) -> dict:
+    """Stand-ins for everything Section 7 reads: a two-scene test set (small synthetic chips), a pipe whose predict() returns
+    masks equal to the labels, and a matplotlib stub (matplotlib is not a CI dependency; see test_review_fixes for the figure)."""
+    from conftest import synthetic_chip
+    from test_review_fixes import matplotlib_stub
+
     history = [{"epoch": 0, "val_loss": 0.5, "val": {"iou": {"burn scar": 0.7}}}, {"epoch": 1, "val_loss": kept_val_loss, "val": {"iou": {"burn scar": adapted_iou}}}]
+    records = []
+    for i in range(2):
+        image, label = synthetic_chip(seed=i, size=32)
+        records.append({"id": f"chip-{i:03d}", "image": image, "label": label})
+    predictions = {"predictions": [{"id": r["id"], "mask": np.clip(r["label"], 0, 1).astype(np.uint8)} for r in records]}
+    sys.modules.setdefault("matplotlib", types.ModuleType("matplotlib"))
+    sys.modules["matplotlib.pyplot"] = matplotlib_stub()
     return {
-        "json": json, "pipe": types.SimpleNamespace(evaluate=lambda records: {"model": _metrics(adapted_iou)}), "test_records": [], "val_records": [],
+        "json": json, "np": np, "pipe": types.SimpleNamespace(evaluate=lambda records: {"model": _metrics(adapted_iou)}, predict=lambda records: predictions),
+        "test_records": records, "val_records": [], "frozen_predictions": predictions, "per_chip_burn_iou": per_chip_burn_iou, "false_colour_composite": false_colour_composite,
         "CLASS_NAMES": ("not burned", "burn scar"), "frozen_test": {"model": _metrics(0.7), "baseline_not_burned": _metrics(0.0)},
-        "frozen_val": {"model": _metrics(0.7)}, "adapt_result": {"history": history, "best_epoch": 1}, "MODEL_ID": "m", "MODEL_REVISION": "r",
+        "frozen_val": {"model": _metrics(0.7)}, "adapt_result": {"history": history, "best_epoch": 1, "gpu_peak_gb": None}, "MODEL_ID": "m", "MODEL_REVISION": "r",
         "MODEL_KEY": "k", "data_source": "stand-in", "dataset_report": {}, "adapt_seconds": 0.0,
     }
 
@@ -263,8 +277,9 @@ def _byod_namespace(path: str) -> dict:
     loaded = []
     return {
         "USE_BYOD": True, "BYOD_PATH": path, "Path": Path, "loaded": loaded,
-        "load_byod_dataset": lambda p: loaded.append(Path(p)) or ["r"],
+        "load_byod_dataset": lambda p: loaded.append(Path(p)) or [{"id": "r", "group": "g"}],
         "split_dataset": lambda records, seed: {"train": records, "validation": records, "test": records},
+        "byod_minimum_records": lambda: 7,
     }
 
 

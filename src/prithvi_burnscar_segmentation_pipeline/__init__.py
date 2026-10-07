@@ -2,7 +2,7 @@
 segmentation, held-out evaluation against a not-burned baseline, and bounded decoder fine-tuning with a portable
 adapter."""
 
-from .metrics import confusion_matrix, majority_baseline, metrics_from_confusion, segmentation_metrics
+from .metrics import confusion_matrix, majority_baseline, metrics_from_confusion, per_chip_burn_iou, segmentation_metrics
 from .pipeline import (
     ADAPTATION_MODES,
     BANDS,
@@ -52,15 +52,20 @@ from .samples import (
     SAMPLE_RECORDS,
     TAR_NAME,
     TAR_SHA256,
+    byod_file_names,
+    byod_minimum_records,
     check_split_disjoint,
     dataset_manifest,
+    example_provenance,
     extract_pinned_members,
+    false_colour_composite,
     fetch_corpus,
     fetch_sample_dataset,
     fetch_tarball,
     load_byod_dataset,
     read_corpus,
     split_dataset,
+    write_byod_example,
     write_dataset_csv,
     write_sample_pair,
 )
@@ -101,6 +106,8 @@ __all__ = [
     "PrithviBurnScarPipeline",
     "audit_pickle",
     "build_model",
+    "byod_file_names",
+    "byod_minimum_records",
     "check_record",
     "check_split_disjoint",
     "chip_digest",
@@ -108,13 +115,16 @@ __all__ = [
     "convert_model",
     "dataset_digest",
     "dataset_manifest",
+    "example_provenance",
     "extract_pinned_members",
+    "false_colour_composite",
     "fetch_corpus",
     "fetch_sample_dataset",
     "fetch_tarball",
     "load_byod_dataset",
     "majority_baseline",
     "metrics_from_confusion",
+    "per_chip_burn_iou",
     "read_chip",
     "read_corpus",
     "read_mask",
@@ -125,6 +135,7 @@ __all__ = [
     "validate_inputs",
     "verify_converted",
     "verify_snapshot",
+    "write_byod_example",
     "write_dataset_csv",
     "write_sample_pair",
 ]

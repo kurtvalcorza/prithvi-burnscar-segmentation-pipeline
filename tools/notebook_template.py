@@ -79,9 +79,11 @@ TEMPLATE = {
         "labelled scenes — as `BYOD_PATH` (a path in the runtime, which works on Colab, Kaggle and Jupyter) or, when it is empty, through "
         "the Colab upload dialog — as a zip (or folder) holding `pairs.csv` (columns `id`, `image`, `label`) beside six-band 512 × 512 GeoTIFF chips "
         "(blue, green, red, narrow NIR, SWIR 1, SWIR 2 — surface reflectance in [0, 1] or × 10 000) and single-band label rasters "
-        "(0 = not burned, 1 = burn scar, −1 = no data); at least four chips with some burn scar. Your chips are split by seed into "
-        "training, validation and test sets and flow through the same contract — validation, frozen baseline, adaptation, "
-        "held-out evaluation, inference, artifact export and reload parity. The expected schema, the ceilings and the privacy "
+        "(0 = not burned, 1 = burn scar, −1 = no data); at least **7** labelled chips with some burn scar (the seeded 25 % test / 20 % validation split must "
+        "leave the 4 training chips adaptation needs; Section 4 prints the minimum and refuses a smaller set by name). An optional `group` column (a fire or HLS "
+        "tile id) keeps every chip of one group in one role, so neighbouring scenes of one fire cannot sit on both sides of the split. Your chips flow through the "
+        "same contract — validation, frozen baseline, adaptation, held-out evaluation, inference, artifact export and reload parity; Section 5 puts the model back "
+        "to the pinned base first, so the frozen numbers on your scenes are the packaged model's. The expected schema, the ceilings and the privacy "
         "guidance are stated in the Prerequisites and in Section 4, and uploaded files stay inside this runtime. BYOD is optional "
         "and never part of the default path."
     ),
@@ -106,7 +108,7 @@ TEMPLATE = {
             're-running Section 6 with other settings is a fresh experiment. **Troubleshooting**, a **Glossary** and a **Conclusion** template are at the end. '
             'Writing your predictions down is optional.\n\n**Roadmap:** 1–3 infrastructure → 4 the labelled scenes, validation and refusals *(evaluation practice)* → '
             '5 the frozen model against the not-burned baseline *(core concept)* → 6 bounded fine-tuning of the neck, decoder and head *(core concept)* → 7 the '
-            'held-out paired comparison *(evaluation practice)* → 8 new scenes, export and fresh reload *(engineering)* → interpretation, troubleshooting, glossary '
+            'held-out paired comparison with per-scene numbers and a figure *(evaluation practice)* → 8 the upstream example scenes and their provenance, export and fresh reload *(engineering)* → interpretation, an optional experiment, troubleshooting, glossary '
             'and your conclusion.'
         ],
     },
@@ -140,8 +142,8 @@ TEMPLATE = {
         "checkpoint, read its static audit and see it converted into safetensors; extract pinned members from a digest-verified "
         "tarball and validate real labelled multispectral scenes with an ignore class; read pixel IoU, F1, precision and recall "
         "against a not-burned baseline; run a bounded decoder fine-tuning with explicit hyperparameters and frozen BatchNorm "
-        "statistics; compare the adapted and frozen models on the same held-out scenes; segment new scenes; and export a safetensors "
-        "adapter that reloads against the pinned base with verified parity."
+        "statistics; compare the adapted and frozen models on the same held-out scenes, per scene and pooled, and look at the masks; segment the upstream example scenes; and export a safetensors "
+        "adapter that reloads against the pinned base with verified parity. The three example scenes are not new to the checkpoint — the notebook shows where each one comes from."
     ),
     "exclusions": (
         "burn severity or dNBR estimation, active-fire detection, temporal stacks (the packaged fine-tune is single-date), tiling of "
@@ -169,9 +171,15 @@ TEMPLATE = {
                 "scenes (already surface reflectance in [0, 1]) and the masks, which keep −1 for no data. `dataset_manifest` "
                 "validates every split, checks that no scene appears twice and records a digest.\n\n"
                 "Look for: 24 / 8 / 12 scenes with burn fractions around 0.12..0.21, tile ids (UTM zone and grid square) per "
-                "split, a written sample pair (`outputs/{stem}_sample_chip.tif` + `_sample_label.tif`, the BYOD shape), and three "
+                "split, a written sample pair (`outputs/{stem}_sample_chip.tif` + `_sample_label.tif`, the BYOD shape), a complete BYOD example "
+                "(`outputs/{stem}_byod_example/`: `pairs.csv` beside the first 7 held-out scenes under the names the table lists — zip that folder and it loads "
+                "through `BYOD_PATH` unchanged; 7 is the smallest dataset the split accepts, and the cell prints it), and three "
                 "refusal probes — a five-band scene, a mask with an unknown class, a scene with reflectance far outside range — "
                 "each rejected before the model runs. The tarball takes about a minute to fetch and a minute to stream.\n\n"
+                "One caveat in the sample itself: 2 of the 12 test scenes (`T10TFQ.2018245`, `T10TGS.2018245`) share an HLS tile with training scenes "
+                "(`T10TFQ.2019245`, `T10TGS.2018190`) — an upstream split choice kept here so the roles match the model repository's, and the reason the "
+                "interpretation says to split by fire or tile. For your own scenes the `group` column of `pairs.csv` does exactly that: `split_dataset` keeps "
+                "every chip of one group in one role, and the cell reports whether the split was grouped.\n\n"
                 "*Evaluation practice.* **Predict before running:** about one pixel in six is burned in these scenes. What accuracy will a "
                 "model get that never predicts a burn?"
             ),
@@ -204,7 +212,10 @@ TEMPLATE = {
                 "        byod_path = Path('work') / file_name\n"
                 "        byod_path.parent.mkdir(parents=True, exist_ok=True)\n"
                 "        byod_path.write_bytes(payload)\n"
-                "    splits = split_dataset(load_byod_dataset(byod_path), seed=0)\n"
+                "    byod_records = load_byod_dataset(byod_path)\n"
+                "    byod_grouped = bool(byod_records) and all(r.get('group') for r in byod_records)\n"
+                "    splits = split_dataset(byod_records, seed=0)\n"
+                "    print({{'byod_chips': len(byod_records), 'minimum_chips': byod_minimum_records(), 'grouped_split': byod_grouped, 'groups': sorted({{r['group'] for r in byod_records}}) if byod_grouped else 'no group column: scenes of one fire or tile may land in different roles'}})\n"
                 "    data_source = 'BYOD (' + file_name + ')'\n"
                 "else:\n"
                 "    splits = fetch_sample_dataset(cache_dir='weights/hls-burn-scars')\n"
@@ -216,7 +227,8 @@ TEMPLATE = {
                 "    print({{name: {{'burn_fraction': part['class_pixel_fraction']['burn scar'], 'ignored_pixels': part['ignored_pixels'], 'tiles': part['regions']}}}})\n"
                 "print({{'first_test_scene': validate_inputs(test_records[0])}})\n"
                 "sample_pair = write_sample_pair(test_records[0], 'outputs/{stem}_sample_chip.tif', 'outputs/{stem}_sample_label.tif')\n"
-                "print({{'sample_pair': sample_pair, 'pairs_csv': str(write_dataset_csv(test_records, 'outputs/{stem}_sample_pairs.csv'))}})\n\n"
+                "byod_example = write_byod_example((test_records + val_records + train_records)[:byod_minimum_records()], 'outputs/{stem}_byod_example')\n"
+                "print({{'sample_pair': sample_pair, 'byod_example': {{k: byod_example[k] for k in ('folder', 'pairs_csv', 'n_pairs', 'minimum_chips')}}, 'how_to_reuse': 'zip the folder and set BYOD_PATH to the zip'}})\n\n"
                 "print({{'validation': INPUT_SCHEMA['validation']}})\n"
                 "probes = {{\n"
                 "    'five-band scene': [{{**test_records[0], 'image': test_records[0]['image'][:5]}}, *test_records[1:4]],\n"
@@ -248,7 +260,10 @@ TEMPLATE = {
                 "outputs, not calibrated probabilities) and the burn fraction per scene. `pipe.evaluate` pools the labelled pixels "
                 "of every held-out scene into one confusion matrix (−1 pixels excluded) and reports the per-class IoU, mean IoU, "
                 "accuracy, and the burn-scar class's precision, recall and F1; the **not-burned baseline** — every pixel predicted "
-                "as unburned — is scored on the same pixels, so its accuracy is exactly the unburned fraction and its burn IoU is 0.\n\n"
+                "as unburned — is scored on the same pixels, so its accuracy is exactly the unburned fraction and its burn IoU is 0. "
+                "The decision rule is the argmax over the two class scores — equivalent to a 0.5 threshold on the burn-scar score — and it is a default, not a tuned "
+                "operating point: a deployment chooses its own threshold on its own validation data, weighing a missed burned pixel against a false one, and owns "
+                "the calibration of the scores; this notebook sets neither.\n\n"
                 "Look for: a burn-scar IoU above 0.9 on the test scenes (in the build record 0.925 with F1 0.961 — this fine-tune is "
                 "strong on its own test split, from which these scenes were drawn) and a lower validation IoU (about 0.76: a few "
                 "validation scenes are hard). These are sample-sanity numbers on 12 and 8 scenes, not the benchmark. If you re-run this "
@@ -298,7 +313,7 @@ TEMPLATE = {
                 "epoch 0, since the packaged model already trained on this dataset.\n\n"
                 "Watch the validation loss: in the build record it dipped at epoch 1 and drifted up afterwards — the sign that a "
                 "small learning rate and validation selection are doing their job on a model that has little left to learn from "
-                "24 scenes of a dataset it trained on. Four epochs (48 steps) take under a minute on a T4. "
+                "24 scenes of a dataset it trained on. Four epochs (48 steps) take under a minute on a T4; the cell prints the peak GPU memory it used. "
                 "`TRAINABLE = 'decoder+last_block'` also unfreezes the last encoder block (32.9 M parameters). Every call starts "
                 "from the pinned base (`started_from` in the printed result), so a re-run with other settings is a fresh experiment, "
                 "not continued training, and epoch 0 is always the frozen model.\n\n"
@@ -321,7 +336,8 @@ TEMPLATE = {
                 "t0 = time.perf_counter()\n"
                 "adapt_result = pipe.adapt(train_records, val_records, epochs=EPOCHS, lr=LEARNING_RATE, batch_size=BATCH_SIZE, trainable=TRAINABLE, progress=report)\n"
                 "adapt_seconds = round(time.perf_counter() - t0, 1)\n"
-                "print({{'trainable_parameters': adapt_result['n_trainable'], 'total_parameters': adapt_result['n_total'], 'steps': adapt_result['n_steps'], 'best_epoch': adapt_result['best_epoch'], 'precision': adapt_result['precision'], 'batchnorm': adapt_result['batchnorm'], 'seconds': adapt_seconds}})"
+                "adapt_result['gpu_peak_gb'] = round(torch.cuda.max_memory_allocated() / 2**30, 2) if torch.cuda.is_available() else None\n"
+                "print({{'trainable_parameters': adapt_result['n_trainable'], 'total_parameters': adapt_result['n_total'], 'steps': adapt_result['n_steps'], 'best_epoch': adapt_result['best_epoch'], 'precision': adapt_result['precision'], 'batchnorm': adapt_result['batchnorm'], 'seconds': adapt_seconds, 'gpu_peak_gb': adapt_result['gpu_peak_gb']}})"
             ),
         },
         {
@@ -329,7 +345,7 @@ TEMPLATE = {
                 '**What to notice:** epoch 0 (`note: frozen model`), the validation loss per epoch, `best_epoch`, and the trainable share of the parameters.\n\n<details><summary>Check '
                 'your reasoning</summary>A little, once. In the recorded run validation loss went from 0.1072 (frozen) to 0.0984 at epoch 1 and then drifted up, so '
                 'epoch 1 was kept (validation burn-scar IoU 0.7627 → 0.7701). A small learning rate and validation-loss selection keep a model with little left to '
-                'learn from getting worse; with a larger rate the frozen model (epoch 0) would win.</details>'
+                'learn from getting worse. What a ten-times larger rate does is the first optional experiment at the end — predict it before you run it.</details>'
             ),
         },
         {
@@ -342,9 +358,14 @@ TEMPLATE = {
                 "scenes reproduces the kept epoch's burn-scar IoU within 0.01 (float16 kernels are not bit-reproducible across batch "
                 "sizes) — and records the test direction as a **verdict** (`improved`, `no change` or `worse`) instead of asserting one: on this sample the burn-scar IoU moved from 0.925 to 0.926 in the "
                 "build record, a sample-sanity observation on 12 scenes with no dispersion estimate, not a quality claim. With your "
-                "own scenes from another region or year, the gap between frozen and adapted is the number to watch.\n\n"
+                "own scenes from another region or year, the gap between frozen and adapted is the number to watch — and in a BYOD run *frozen* is the packaged "
+                "model, because Section 5 restored the pinned base before scoring it.\n\n"
+                "The pooled numbers let large burns dominate, so the cell also prints the burn-scar IoU **per scene** for both models and the range across the "
+                "12 scenes, and it draws the first two held-out scenes: a SWIR 2 / NIR / red composite (burn scars are bright and reddish, healthy vegetation "
+                "dark), the label, the frozen and adapted masks, and the adapted model's errors (red = burned pixels it missed, blue = unburned pixels it "
+                "called burned; grey = no data). The figure is written to `outputs/{stem}_test_scenes.png`.\n\n"
                 "*Evaluation practice.* **Predict before running:** after fine-tuning on 24 scenes, will the test burn-scar IoU move by "
-                "more than 0.01?"
+                "more than 0.01 — and if precision and recall move, will they move the same way?"
             ),
             "code": (
                 "adapted_test = pipe.evaluate(test_records)\n"
@@ -360,12 +381,39 @@ TEMPLATE = {
                 "comparison['verdict'] = {{'adapted_vs_frozen_burn_iou': 'improved' if delta_burn_iou > 0 else ('no change' if delta_burn_iou == 0 else 'worse'), 'delta': round(delta_burn_iou, 4)}}\n"
                 "print({{'verdict': comparison['verdict']}})\n"
                 "print({{'validation_burn_iou': {{'frozen': frozen_val['model']['iou']['burn scar'], 'adapted': adapted_val['model']['iou']['burn scar']}}, 'validation_loss': {{'frozen': adapt_result['history'][0]['val_loss'], 'kept_epoch': adapt_result['history'][adapt_result['best_epoch']]['val_loss']}}}})\n"
+                "# BS-S4: per-scene burn-scar IoU (the pooled metric lets large burns dominate).\n"
+                "adapted_predictions = pipe.predict(test_records)\n"
+                "test_labels, test_ids = [r['label'] for r in test_records], [r.get('source_id', r['id']) for r in test_records]\n"
+                "per_scene = {{'frozen': per_chip_burn_iou([p['mask'] for p in frozen_predictions['predictions']], test_labels, test_ids), 'adapted': per_chip_burn_iou([p['mask'] for p in adapted_predictions['predictions']], test_labels, test_ids)}}\n"
+                "for f_row, a_row in zip(per_scene['frozen'], per_scene['adapted']):\n"
+                "    print({{'scene': f_row['id'], 'burn_label': f_row['positive_fraction'], 'frozen_burn_iou': f_row['iou'], 'adapted_burn_iou': a_row['iou']}})\n"
+                "comparison['per_scene_burn_iou_range'] = {{name: [min(v), max(v)] if (v := [row['iou'] for row in rows if row['iou'] is not None]) else None for name, rows in per_scene.items()}}\n"
+                "print({{'per_scene_burn_iou_range': comparison['per_scene_burn_iou_range']}})\n"
+                "# BS-m6: see the scenes, labels, masks and errors, not only the numbers.\n"
+                "import matplotlib.pyplot as plt\n\n"
+                "shown = list(zip(test_records, frozen_predictions['predictions'], adapted_predictions['predictions']))[:2]\n"
+                "fig, axes = plt.subplots(len(shown), 5, figsize=(17, 3.6 * len(shown)), squeeze=False)\n"
+                "for row, (record, frozen_pred, adapted_pred) in zip(axes, shown):\n"
+                "    label, composite = record['label'], false_colour_composite(record['image'])\n"
+                "    errors = composite * 0.35\n"
+                "    errors[(label == 1) & (adapted_pred['mask'] == 0)] = (1.0, 0.1, 0.1)\n"
+                "    errors[(label == 0) & (adapted_pred['mask'] == 1)] = (0.2, 0.4, 1.0)\n"
+                "    errors[label < 0] = 0.5\n"
+                "    panels = [('SWIR 2 / NIR / red', composite, None), ('label (white = burn, grey = no data)', np.where(label < 0, 0.5, label.astype(np.float32)), 'gray'), ('frozen mask', frozen_pred['mask'], 'gray'), ('adapted mask', adapted_pred['mask'], 'gray'), ('adapted errors (red missed, blue false)', errors, None)]\n"
+                "    for ax, (title, image, cmap) in zip(row, panels):\n"
+                "        ax.imshow(image, cmap=cmap, vmin=0, vmax=1, interpolation='nearest')\n"
+                "        ax.set_title(record.get('source_id', record['id']) + ': ' + title, fontsize=9)\n"
+                "        ax.set_axis_off()\n"
+                "fig.tight_layout()\n"
+                "fig.savefig('outputs/{stem}_test_scenes.png', dpi=80)\n"
+                "plt.show()\n"
                 "evaluation_report = {{\n"
                 "    'model': {{'id': MODEL_ID, 'revision': MODEL_REVISION, 'key': MODEL_KEY}},\n"
                 "    'data_source': data_source,\n"
                 "    'dataset': dataset_report,\n"
                 "    'frozen': {{'test': frozen_test, 'validation': frozen_val}},\n"
                 "    'adapted': {{'test': adapted_test, 'validation': adapted_val}},\n"
+                "    'per_scene_burn_iou': per_scene,\n"
                 "    'comparison': comparison,\n"
                 "    'adaptation': {{k: v for k, v in adapt_result.items() if k not in ('history', 'trainable_names')}},\n"
                 "    'history': adapt_result['history'],\n"
@@ -383,18 +431,25 @@ TEMPLATE = {
         },
         {
             "md": (
-                '**What to notice:** the `burn_iou` row (baseline, frozen, adapted), `accuracy`, and the `verdict` line with its `delta`.\n\n<details><summary>Check your '
-                'reasoning</summary>No. In the recorded run the test burn-scar IoU moved from 0.9251 to 0.9263 (F1 0.9611 → 0.9618, accuracy 0.9833 → 0.9839): the '
-                'verdict was *improved* by about 0.001, far inside what one seed and 12 scenes can resolve. Read it as *the contract ran and did no harm*, not as a '
-                'gain. On scenes from another region or year the same delta is the number that matters.</details>'
+                '**What to notice:** the `burn_iou` row (baseline, frozen, adapted), the `precision` and `recall` rows, the `verdict` line with its `delta`, the per-scene range, and in the figure where the red and blue pixels sit.\n\n<details><summary>Check your '
+                'reasoning</summary>No, and not the same way. In the recorded run the test burn-scar IoU moved from 0.9251 to 0.9263 (F1 0.9611 → 0.9618, accuracy 0.9833 → 0.9839): the '
+                'verdict was *improved* by about 0.001, far inside what one seed and 12 scenes can resolve. Underneath that flat IoU, precision rose from 0.9528 to 0.9741 while recall fell '
+                'from 0.9695 to 0.9498: the adapted model draws tighter scars — fewer unburned pixels called burned, more burned pixels missed — a trade that matters for '
+                'burned-area mapping (a conservative map under-reports area) even when the IoU does not move. Read the verdict as *the contract ran and did no harm*, not as a '
+                'gain, and read the per-scene range to see which scenes the pooled number hides. On scenes from another region or year the same delta is the number that matters.</details>'
             ),
         },
         {
             "md": (
-                "## 8. New scenes, artifact export and fresh reload\n\n"
-                "The adapted model segments the three example scenes that ship with the upstream repository (three HLS tiles over "
-                "California, 2018 and 2020), which carry no labels here: the predicted burn fraction per scene and a written mask are "
-                "a sanity check, not an evaluation.\n\n"
+                "## 8. The upstream example scenes, artifact export and fresh reload\n\n"
+                "The adapted model segments the three example scenes that ship with the upstream model repository (three HLS tiles over "
+                "California, 2018 and 2020). **None of them is new to the checkpoint**, and the cell says so for each scene from the files themselves: "
+                "`example_provenance` hashes the scene, looks it up in the checkpoint's own `splits/train.txt`, `val.txt` and `test.txt`, and compares it with the 44 "
+                "pinned sample records. `T10SEH.2018190.v1` is byte-identical to sample test scene `test-001`, which Section 7 has already scored — so here its "
+                "mask is compared with that label (burn-scar IoU printed as `label_agreement`); `T10SFF.2018190.v1` and `T10SGF.2020217.v1` are in the "
+                "checkpoint's training split, so their burn fractions show what the model reproduces on scenes it trained on, not generalisation. They are used "
+                "because they are the only unlabelled-looking inputs the model repository ships; a real sanity check on *new* scenes needs scenes from outside this "
+                "dataset, which is what BYOD is for.\n\n"
                 "`pipe.save_artifact` writes the trained tensors (about 81 MB) as `adapter.safetensors`, with a `manifest.json` "
                 "recording the artifact format, the base model id and revision, the digest of the converted base file, the "
                 "adaptation scope, the tensor names, the file size and SHA-256, the training configuration and the epoch history "
@@ -411,11 +466,24 @@ TEMPLATE = {
                 "example_dir = WEIGHTS_DIR / 'examples'\n"
                 "new_records = [{{'id': path.stem.replace('subsetted_512x512_HLS.S30.', ''), 'image': read_chip(path), 'source': str(path.name)}} for path in sorted(example_dir.glob('*.tif'))]\n"
                 "new_predictions = pipe.predict(new_records)\n"
+                "# BS-m2: say what each example scene is (checkpoint split files + pinned sample digests), never call it new.\n"
+                "provenance = {{}}\n"
                 "for record, pred in zip(new_records, new_predictions['predictions']):\n"
                 "    tifffile.imwrite(f'outputs/{stem}_mask_' + record['id'] + '.tif', pred['mask'])\n"
-                "    print({{'scene': record['id'], 'burn_fraction': pred['class_fraction']['burn scar'], 'note': 'sanity check, no label'}})\n"
+                "    prov = example_provenance(example_dir / record['source'], WEIGHTS_DIR / 'splits')\n"
+                "    row = {{'scene': record['id'], 'burn_fraction': pred['class_fraction']['burn scar'], 'checkpoint_split': prov['upstream_split'], 'sample_record': prov['sample_record']}}\n"
+                "    labelled = [r for r in test_records if r.get('source_id') == (prov['sample_record'] or {{}}).get('key')]\n"
+                "    if labelled:\n"
+                "        row['label_agreement'] = per_chip_burn_iou([pred['mask']], [labelled[0]['label']], [labelled[0]['id']])[0]\n"
+                "        row['note'] = 'a sample test scene already scored in Section 7 (byte-identical); compared with its label here'\n"
+                "    elif prov['upstream_split']:\n"
+                "        row['note'] = 'in the checkpoint ' + '/'.join(prov['upstream_split']) + ' split: reproduction on a training scene, not generalisation'\n"
+                "    else:\n"
+                "        row['note'] = 'not in the checkpoint split files or the sample: a sanity check without a label'\n"
+                "    provenance[record['id']] = row\n"
+                "    print(row)\n"
                 "with open('outputs/{stem}_predictions.json', 'w', encoding='utf-8') as f:\n"
-                "    json.dump({{'model': new_predictions['model'], 'classes': new_predictions['classes'], 'decision_rule': new_predictions['decision_rule'], 'predictions': [{{'id': p['id'], 'class_fraction': p['class_fraction']}} for p in new_predictions['predictions']]}}, f, indent=2)\n\n"
+                "    json.dump({{'model': new_predictions['model'], 'classes': new_predictions['classes'], 'decision_rule': new_predictions['decision_rule'], 'predictions': [{{'id': p['id'], 'class_fraction': p['class_fraction'], 'provenance': provenance[p['id']]}} for p in new_predictions['predictions']]}}, f, indent=2)\n\n"
                 "artifact_dir = Path('outputs/{stem}_adapter')\n"
                 "shutil.rmtree(artifact_dir, ignore_errors=True)\n"
                 "pipe.save_artifact(artifact_dir, metadata={{'tutorial': '{stem}', 'data_source': data_source}})\n"
@@ -447,6 +515,8 @@ TEMPLATE = {
                 "    'data_source': data_source,\n"
                 "    'comparison': comparison,\n"
                 "    'verdict': comparison['verdict'],\n"
+                "    'example_scenes': provenance,\n"
+                "    'adaptation_gpu_peak_gb': adapt_result['gpu_peak_gb'],\n"
                 "    'artifact': {{'dir': str(artifact_dir), 'sha256': artifact_manifest['files'][0]['sha256'], 'bytes': artifact_manifest['files'][0]['bytes']}},\n"
                 "    'reload_parity': parity,\n"
                 "}}\n"
@@ -460,8 +530,9 @@ TEMPLATE = {
         },
         {
             "md": (
-                "**What to notice:** the burn fraction of the three unlabelled example scenes, the artifact's size and tensor count, and `reload_parity`.\n\n<details><summary>Check "
-                'your reasoning</summary>The example scenes carry no labels, so their burn fractions are a sanity check only. In the recorded run the adapter (34 '
+                "**What to notice:** each example scene's `checkpoint_split` and `sample_record`, the `label_agreement` of the one that is a sample test scene, the artifact's size and tensor count, and `reload_parity`.\n\n<details><summary>Check "
+                'your reasoning</summary>One example scene is sample test scene `test-001` (in the recorded run its label had burn fraction 0.791 and the adapted model predicted 0.7891), '
+                'the other two are in the checkpoint\'s training split, so none of the three burn fractions says anything about new scenes. In the recorded run the adapter (34 '
                 'tensors, about 81 MB) reloaded into a fresh pipeline with identical held-out metrics (`positive_iou_diff` 0.0, `metrics_identical` True, '
                 '`max_abs_score_diff` 0.0): the adapter plus the pinned, re-verified base is the whole adapted model.</details>'
             ),
@@ -471,7 +542,8 @@ TEMPLATE = {
         "## Interpretation and limits\n\n"
         "On 12 held-out scenes from the model repository's test split the packaged burn-scar model finds burn scars with an IoU "
         "above 0.9, against a not-burned baseline that scores 0; a bounded fine-tuning of its neck, decoder and head on 24 scenes, "
-        "selected by validation loss with the frozen model as a candidate, leaves those numbers where they were. That is the "
+        "selected by validation loss with the frozen model as a candidate, leaves the IoU where it was (0.9251 → 0.9263 in the build record) while trading "
+        "recall for precision underneath it (precision 0.9528 → 0.9741, recall 0.9695 → 0.9498): a tighter, more conservative scar map. That is the "
         "claim: the adaptation contract runs end to end on real labelled multispectral scenes drawn from a digest-verified "
         "tarball, the pickle is audited and converted rather than served, and the artifact that carries the change is 81 MB and "
         "reloads with the same outputs. It is not a claim that this sample improves the model — the model already trained on "
@@ -493,9 +565,20 @@ TEMPLATE = {
         "frozen model on held-out scenes, and emit the shown machine-readable artifacts — without the repository being "
         "reachable. It does **not** establish benchmark superiority, production fitness, or burn-mapping skill beyond the checks "
         "shown.\n\n"
-        "**Optional experiments (they do not affect the default path):** set `TRAINABLE = 'decoder+last_block'`; raise "
-        "`EPOCHS` and watch the validation loss drift; try `LEARNING_RATE = 1e-4` to see the frozen model win every epoch; or "
-        "bring your own labelled scenes through BYOD and read the baseline before the adapted number.\n\n"
+        "## Optional experiment: Predict → Change → Run → Observe → Explain\n\n"
+        "None of this affects the default path, and every adaptation starts from the pinned base, so each run is a fresh experiment rather than continued "
+        "training. **Scope of a re-run:** change the form field in Section 6, then run Sections 6, 7 and 8 in that order (Section 5 need not be re-run; if you do, "
+        "it restores the base and prints `restored_pinned_base`). Pick one:\n\n"
+        "1. **Learning rate.** *Predict:* with `LEARNING_RATE = 1e-4` (ten times the default) on a model that already trained on this dataset, will any epoch beat "
+        "the frozen model's validation loss (0.1072 in the record), or will epoch 0 be kept? *Change* the field, *run* 6–8, *observe* `best_epoch`, the per-epoch "
+        "`val_loss` and the verdict, and *explain* the result in terms of what a larger step does to a model near a minimum. There is no recorded outcome for "
+        "this setting; your run is the evidence.\n"
+        "2. **Scope.** *Predict:* does `TRAINABLE = 'decoder+last_block'` (32.9 M parameters) change the validation loss curve or the precision/recall trade? "
+        "*Observe* `trainable_parameters`, `gpu_peak_gb` and the comparison rows.\n"
+        "3. **Epochs.** *Predict:* with `EPOCHS = 10`, where does the validation loss bottom out, and does the kept epoch change? *Observe* the drift after the "
+        "minimum and whether the verdict moves.\n"
+        "4. **Your own scenes.** Set `USE_BYOD = True` with `BYOD_PATH` (a `group` column keeps one fire in one role) and re-run from Section 4: read the "
+        "not-burned baseline before the adapted number, and compare the frozen column — the packaged model — with the adapted one.\n\n"
         '## Troubleshooting\n\n- **Section 1 stops with "This notebook needs a Linux x86_64 runtime"** — you are on Windows, macOS or an ARM machine. Use Google '
         'Colab, Kaggle or a Linux x86_64 Jupyter server.\n- **The uv wheel fails its size/SHA-256 check, or a download in Section 1 times out** — run Section 1 '
         'again; a complete environment built from the same lock is reused, an incomplete one is finished. If it repeats, the network is blocking or altering '
@@ -507,10 +590,14 @@ TEMPLATE = {
         "folder and run Section 3 again.\n- **Section 4 stops on the tarball's size or SHA-256** — the 2.6 GB download was cut short or altered. Run Section 4 "
         'again: a truncated download is fetched again, and scenes already extracted and verified are reused. If the digest still fails, delete '
         '`weights/hls-burn-scars/` and run it once more.\n- **CUDA out of memory in Section 6** — another notebook holds the GPU, or `TRAINABLE = '
-        "'decoder+last_block'` with a larger `BATCH_SIZE` exceeds a T4. Restart the session, keep `BATCH_SIZE = 2`, and choose **Run all**.\n- **Section 5 "
+        "'decoder+last_block'` with a larger `BATCH_SIZE` exceeds a T4. Restart the session, keep `BATCH_SIZE = 2`, and choose **Run all**.\n- **Section 7 shows no figure** — the figure is also written to `outputs/{stem}_test_scenes.png`; on Jupyter make sure the notebook is trusted.\n- **Section 5 "
         'prints `restored_pinned_base`** — you re-ran it after Section 6; the adapted tensors were put back to the base. Re-run Sections 6–8 in order.\n- '
         '**BYOD: a band, shape or label refusal** — the message names the rule; chips must be six-band 512 × 512 GeoTIFFs in the documented band order with '
-        'masks of 0 / 1 / −1, and at least four chips need some burn scar.\n- **BYOD: "BYOD_PATH … does not exist"** — the path is relative to the working '
+        'masks of 0 / 1 / −1, and the dataset needs some burn-scar pixels.\n- **BYOD: "… bring at least 7 chips"** — the seeded split takes 25 % for test and 20 % '
+        'for validation and must leave 4 training chips, so 7 distinct labelled chips is the minimum (more if a `group` column puts many chips in one group).\n- '
+        '**BYOD: "pairs.csv row … is listed but not in the zip"** or **"… is not a readable GeoTIFF"** — the message names the row and the file; fix the name in '
+        '`pairs.csv` or replace the file. `outputs/{stem}_byod_example/` is a complete, loadable example of the layout.\n- **BYOD: "chips have no \'group\'"** — '
+        'either give every row a `group` value (a fire or tile id) or leave the column out.\n- **BYOD: "BYOD_PATH … does not exist"** — the path is relative to the working '
         'directory printed in the message.\n- **BYOD: "the upload dialog exists only in Google Colab"** — on Kaggle or Jupyter, put the zip (or folder) in the '
         'runtime and set `BYOD_PATH` to its path.\n- **BYOD: "Upload exactly one .zip file"** — the dialog was cancelled or several files were chosen; run the '
         "cell again.\n\n## Glossary\n\n- **HLS (Harmonized Landsat Sentinel-2):** NASA's surface-reflectance product that puts Landsat 8/9 and Sentinel-2 on one 30 "
@@ -522,12 +609,13 @@ TEMPLATE = {
         'real; the share of real burn found; their harmonic mean.\n- **Encoder, neck, decoder, head:** the ViT-L backbone that turns patches into features; the '
         'pyramid that rescales them; the U-Net that upsamples them to pixels; the final two-class layer.\n- **Frozen / adapted:** the packaged model as '
         'downloaded / after Section 6 trained the neck, decoder and head.\n- **Pinned base:** the verified packaged weights; every adaptation starts from them (`restore_base`).\n- '
+        '**Group (fire or tile) split:** assigning every chip of one fire or HLS tile to one role, so near-duplicate neighbours cannot sit in both training and test; the `group` column of `pairs.csv`.\n- **Precision / recall trade:** a model can raise precision (fewer false burned pixels) while lowering recall (more missed burned pixels) with the IoU barely moving; Section 7 shows both.\n- '
         '**BatchNorm statistics:** running means and variances inside the decoder; kept fixed because two-scene batches would corrupt them.\n- **Validation-loss '
         'selection:** keeping the epoch with the lowest validation loss, with the frozen model as epoch 0.\n- **Pickle audit / safetensors:** the upstream '
         'checkpoint is a pickle that could run code when loaded; it is statically checked against an allow-list and converted once to safetensors, a format '
         'that stores only tensors.\n- **Isolated environment:** the separate Python environment Section 1 builds from the hash lock; every later cell runs there.\n\n## '
         "Conclusion (your notes)\n\nComplete these in your own words; the recorded run's values are in the **Check your reasoning** answers above.\n\n- The frozen "
-        "model's test burn-scar IoU was ___ against the not-burned baseline's ___.\n- Bounded fine-tuning moved it to ___ (verdict: ___), which I read as ___.\n- "
+        "model's test burn-scar IoU was ___ against the not-burned baseline's ___.\n- Bounded fine-tuning moved it to ___ (verdict: ___) and moved precision ___ and recall ___, which I read as ___.\n- "
         'The number I would not trust on its own is ___, because ___.\n- Before adapting on my own scenes I would check the band order and scaling, split by '
         '___, and compare against ___.\n\n'
         "## References\n\n"
