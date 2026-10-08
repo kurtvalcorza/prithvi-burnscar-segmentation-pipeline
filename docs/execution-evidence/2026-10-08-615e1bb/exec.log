@@ -1,0 +1,108 @@
+[colab] Parsing notebook '/home/kurt/colab-runs/prithvi-burnscar-segmentation-pipeline-615e1bb-7384e1/prithvi_burnscar_segmentation_colab_615e1bb_colab-cli-t4.ipynb'...
+[colab] Executing cell 1/11 - Infrastructure: build (or reuse) the isolated environment and route later cells to it...
+{'isolated_environment': '/content/dimer_isolated_env_0f2c040bc50a', 'reused': False, 'isolated_python': '3.12.12', 'kernel_python': '3.13.15', 'locked_packages': 131, 'setup_seconds': 67}
+{'routed_to': '/content/dimer_isolated_env_0f2c040bc50a/bin/python', 'worker_pid': 955, 'worker_reused': False}
+[colab] Executing cell 2/11 - Infrastructure: record the runtime...
+{'notebook_source': {'repository': 'prithvi-burnscar-segmentation-pipeline', 'repository_revision': 'fbeff73285b8cf34f7f7877f78271ba2d8c6e0ad', 'embedded_module': 'src/prithvi_burnscar_segmentation_pipeline/pipeline.py', 'embedded_modules': ['src/prithvi_burnscar_segmentation_pipeline/pipeline.py', 'src/prithvi_burnscar_segmentation_pipeline/metrics.py', 'src/prithvi_burnscar_segmentation_pipeline/samples.py'], 'module_sha256': '7a6654f457f3fb8f611a33fd952f0ef96b1793842076bdccbf2713f6046c9ec9', 'generator': 'build_notebook.py/2.2', 'notebook_spec': '2.0'}, 'python': '3.12.12', 'executable': '/content/dimer_isolated_env_0f2c040bc50a/bin/python', 'torch': '2.14.0+cu130', 'timm': '1.0.30', 'lightning': '2.6.6', 'tifffile': '2026.9.15', 'cuda': True}
+[colab] Executing cell 3/11 - prithvi_burnscar_segmentation-08...
+[colab] Executing cell 4/11 - prithvi_burnscar_segmentation-10...
+[colab] Executing cell 5/11 - prithvi_burnscar_segmentation-12...
+[colab] Executing cell 6/11 - Infrastructure: stage and digest-verify the pinned snapshot, then load the model...
+{'model_id': 'ibm-nasa-geospatial/Prithvi-EO-2.0-300M-BurnScars', 'revision': 'a3f2c410e45b8ac7417976614528a872f024d831', 'license': 'apache-2.0', 'files': 10, 'total_bytes': 1316707805}
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+{'weights_dir': '/content/weights/prithvi-eo-2.0-300m-burnscars', 'fetched': ['README.md', 'config.json', 'burn_scars_config.yaml', 'Prithvi_EO_V2_300M_BurnScars.pt', 'splits/train.txt', 'splits/val.txt', 'splits/test.txt', 'examples/subsetted_512x512_HLS.S30.T10SEH.2018190.v1.4_merged.tif', 'examples/subsetted_512x512_HLS.S30.T10SFF.2018190.v1.4_merged.tif', 'examples/subsetted_512x512_HLS.S30.T10SGF.2020217.v1.4_merged.tif']}
+{'verified_files': 10, 'revision': 'a3f2c410e45b8ac7417976614528a872f024d831'}
+/content/dimer_isolated_env_0f2c040bc50a/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+{'conversion': {'source': {'path': 'Prithvi_EO_V2_300M_BurnScars.pt', 'bytes': 1297798380, 'sha256': '0c5f9334be9a75c9006387ab8f3dc05a55ea7fb5ef7956717316be57c62954d3'}, 'audit': {'file': 'Prithvi_EO_V2_300M_BurnScars.pt', 'torch_archive': True, 'pickles': 1, 'globals': ['collections.OrderedDict', 'torch.FloatStorage', 'torch.LongStorage', 'torch._utils._rebuild_tensor_v2'], 'violations': [], 'audit_sha256': '5b9f0ba08490293d6c17b9cef219991e1a6edda31609429679f8dca1af5a7b10'}, 'checkpoint': {'epoch': 40, 'global_step': 2665, 'lightning_version': '2.5.0.post0'}, 'converted': [{'path': 'prithvi-eo-2.0-300m-burnscars.safetensors', 'bytes': 1297682024, 'sha256': '4209c5a013f90dfe372abb4ade3865e7a283d655ef17b1c7de95d36ecc033c3f'}], 'seconds': 40.23}}
+{'device': 'cuda', 'source': 'converted from the manifest-verified source checkpoint'}
+[colab] Executing cell 7/11 - prithvi_burnscar_segmentation-16...
+{'data_source': "HLS Burn Scars scenes (NASA IMPACT / UAH); Hugging Face dataset ibm-nasa-geospatial/hls_burn_scars, 44 scenes selected 2026-09-19 from the model repository's splits; CC BY 4.0 (NASA IMPACT / University of Alabama in Huntsville)", 'splits': {'train': 24, 'validation': 8, 'test': 12}, 'disjoint': {'train': 24, 'validation': 8, 'test': 12}, 'digest': '5994bab13768b0f9...'}
+{'train': {'burn_fraction': 0.1497, 'ignored_pixels': 46283, 'tiles': ['T10SFE', 'T10SGE', 'T10SGG', 'T10TFN', 'T10TFQ', 'T10TGS', 'T10UGU', 'T11SMT', 'T11TPE', 'T12STG', 'T12SYG', 'T12TVK', 'T12TWT', 'T13RGP', 'T13SDT', 'T13SFT', 'T14SLE', 'T15RWQ', 'T15STA', 'T15SWV', 'T16RFU', 'T16SDD', 'T17SLT']}}
+{'validation': {'burn_fraction': 0.122, 'ignored_pixels': 336, 'tiles': ['T10TFM', 'T11SPV', 'T11TMF', 'T12RXV', 'T13TBE', 'T13TDE', 'T14SMC', 'T15SWA']}}
+{'test': {'burn_fraction': 0.2131, 'ignored_pixels': 76, 'tiles': ['T10SDH', 'T10SEH', 'T10TFQ', 'T10TFT', 'T10TGS', 'T10TGT', 'T11TPH', 'T12SVD', 'T13REQ', 'T13SDV', 'T13TDL', 'T15SXB']}}
+{'first_test_scene': {'id': 'test-000', 'shape': (6, 512, 512), 'reflectance_range': [0.0, 0.4514], 'has_label': True, 'label_fraction': {'not burned': 0.2066, 'burn scar': 0.7934}, 'ignored_pixels': 4}}
+{'sample_pair': {'image': 'outputs/prithvi_burnscar_segmentation_sample_chip.tif', 'label': 'outputs/prithvi_burnscar_segmentation_sample_label.tif'}, 'byod_example': {'folder': 'outputs/prithvi_burnscar_segmentation_byod_example', 'pairs_csv': 'outputs/prithvi_burnscar_segmentation_byod_example/pairs.csv', 'n_pairs': 7, 'minimum_chips': 7}, 'how_to_reuse': 'zip the folder and set BYOD_PATH to the zip'}
+{'validation': 'record shape, band count, chip size, finiteness, value range and label values only. Nothing checks that the bands are the six HLS bands in the right order, that the reflectance is atmospherically corrected, or that the label was drawn for this chip -- any six-band 512 × 512 array is segmented without complaint'}
+{'probe': 'five-band scene', 'rejected': 'records[0]: image must have shape (6, 512, 512), got (5, 512, 512)'}
+{'probe': 'unknown label class', 'rejected': 'records[0]: label values [7] outside [-1, 0, 1]'}
+{'probe': 'reflectance out of range', 'rejected': 'records[0]: reflectance outside the plausible range after scaling: (0.0, 2.256999969482422)'}
+[colab] Executing cell 8/11 - prithvi_burnscar_segmentation-19...
+{'seconds': 6.5, 'metric': 'pixel IoU / F1 over the labelled pixels of the held-out chips (ignore index excluded)'}
+{'baseline_not_burned_test': {'iou': {'not burned': 0.7869, 'burn scar': 0.0}, 'accuracy': 0.7869, 'f1': 0.0}}
+{'frozen_test': {'iou': {'not burned': 0.9789, 'burn scar': 0.9251}, 'mean_iou': 0.952, 'accuracy': 0.9833, 'precision': 0.9528, 'recall': 0.9695, 'f1': 0.9611}}
+{'frozen_validation': {'iou': {'not burned': 0.9631, 'burn scar': 0.7627}, 'f1': 0.8654}}
+{'scene': 'T10SDH.2020248.v1', 'burn_label': 0.793, 'burn_predicted': 0.7423, 'ignored': 4}
+{'scene': 'T10SEH.2018190.v1', 'burn_label': 0.791, 'burn_predicted': 0.7972, 'ignored': 0}
+{'scene': 'T10TFQ.2018245.v1', 'burn_label': 0.03, 'burn_predicted': 0.0332, 'ignored': 0}
+{'scene': 'T10TFT.2018213.v1', 'burn_label': 0.057, 'burn_predicted': 0.0755, 'ignored': 4}
+{'scene': 'T10TGS.2018245.v1', 'burn_label': 0.031, 'burn_predicted': 0.0353, 'ignored': 68}
+{'scene': 'T10TGT.2018188.v1', 'burn_label': 0.127, 'burn_predicted': 0.1345, 'ignored': 0}
+{'decision_rule': 'argmax over the two class scores (no threshold)', 'scores_shape': (2, 512, 512)}
+[colab] Executing cell 9/11 - prithvi_burnscar_segmentation-22...
+{'epoch': 0, 'train_loss': None, 'val_loss': 0.1072, 'val_burn_iou': 0.7627, 'val_f1': 0.8654, 'note': 'frozen model'}
+{'epoch': 1, 'train_loss': 0.0429, 'val_loss': 0.0984, 'val_burn_iou': 0.77, 'val_f1': 0.8701}
+{'epoch': 2, 'train_loss': 0.0352, 'val_loss': 0.1034, 'val_burn_iou': 0.7717, 'val_f1': 0.8711}
+{'epoch': 3, 'train_loss': 0.0314, 'val_loss': 0.1034, 'val_burn_iou': 0.7676, 'val_f1': 0.8685}
+{'epoch': 4, 'train_loss': 0.0318, 'val_loss': 0.1051, 'val_burn_iou': 0.7654, 'val_f1': 0.8671}
+{'trainable_parameters': 20318338, 'total_parameters': 324204674, 'steps': 48, 'best_epoch': 1, 'precision': 'float16 autocast + GradScaler', 'batchnorm': 'running statistics frozen (eval mode) during adaptation', 'seconds': 22.5, 'gpu_peak_gb': 2.01}
+[colab] Executing cell 10/11 - prithvi_burnscar_segmentation-25...
+{'mean_iou': {'baseline_not_burned': 0.3934, 'frozen': 0.952, 'adapted': 0.9531}}
+{'accuracy': {'baseline_not_burned': 0.7869, 'frozen': 0.9833, 'adapted': 0.9839}}
+{'precision': {'baseline_not_burned': 0.0, 'frozen': 0.9528, 'adapted': 0.9741}}
+{'recall': {'baseline_not_burned': 0.0, 'frozen': 0.9695, 'adapted': 0.9498}}
+{'f1': {'baseline_not_burned': 0.0, 'frozen': 0.9611, 'adapted': 0.9618}}
+{'burn_iou': {'baseline_not_burned': 0.0, 'frozen': 0.9251, 'adapted': 0.9263}}
+{'verdict': {'adapted_vs_frozen_burn_iou': 'improved', 'delta': 0.0012}}
+{'validation_burn_iou': {'frozen': 0.7627, 'adapted': 0.77}, 'validation_loss': {'frozen': 0.10724160820245743, 'kept_epoch': 0.09840081445872784}}
+{'scene': 'T10SDH.2020248.v1', 'burn_label': 0.7934, 'frozen_burn_iou': 0.9123, 'adapted_burn_iou': 0.8837}
+{'scene': 'T10SEH.2018190.v1', 'burn_label': 0.7911, 'frozen_burn_iou': 0.9905, 'adapted_burn_iou': 0.9937}
+{'scene': 'T10TFQ.2018245.v1', 'burn_label': 0.0304, 'frozen_burn_iou': 0.8962, 'adapted_burn_iou': 0.9103}
+{'scene': 'T10TFT.2018213.v1', 'burn_label': 0.0574, 'frozen_burn_iou': 0.7528, 'adapted_burn_iou': 0.7794}
+{'scene': 'T10TGS.2018245.v1', 'burn_label': 0.0313, 'frozen_burn_iou': 0.8713, 'adapted_burn_iou': 0.9042}
+{'scene': 'T10TGT.2018188.v1', 'burn_label': 0.127, 'frozen_burn_iou': 0.936, 'adapted_burn_iou': 0.949}
+{'scene': 'T11TPH.2020174.v1', 'burn_label': 0.0411, 'frozen_burn_iou': 0.9096, 'adapted_burn_iou': 0.9074}
+{'scene': 'T12SVD.2019183.v1', 'burn_label': 0.0441, 'frozen_burn_iou': 0.744, 'adapted_burn_iou': 0.7494}
+{'scene': 'T13REQ.2018156.v1', 'burn_label': 0.0372, 'frozen_burn_iou': 0.8332, 'adapted_burn_iou': 0.8588}
+{'scene': 'T13SDV.2020269.v1', 'burn_label': 0.0725, 'frozen_burn_iou': 0.6536, 'adapted_burn_iou': 0.7705}
+{'scene': 'T13TDL.2020280.v1', 'burn_label': 0.5004, 'frozen_burn_iou': 0.955, 'adapted_burn_iou': 0.9556}
+{'scene': 'T15SXB.2020089.v1', 'burn_label': 0.0315, 'frozen_burn_iou': 0.9267, 'adapted_burn_iou': 0.9382}
+{'per_scene_burn_iou_range': {'frozen': [0.6536, 0.9905], 'adapted': [0.7494, 0.9937]}}
+<Figure size 1700x720 with 10 Axes>
+
+[Image saved to: /tmp/tmph6xw_fb1.png]
+{'report': 'outputs/prithvi_burnscar_segmentation_evaluation_report.json'}
+[colab] Executing cell 11/11 - prithvi_burnscar_segmentation-28...
+{'scene': 'T10SEH.2018190.v1.4_merged', 'burn_fraction': 0.7891, 'checkpoint_split': ['test'], 'sample_record': {'key': 'T10SEH.2018190.v1', 'role': 'test'}, 'label_agreement': {'id': 'test-001', 'iou': 0.9937, 'positive_fraction': 0.7911, 'labelled_pixels': 262144}, 'note': 'a sample test scene already scored in Section 7 (byte-identical); compared with its label here'}
+{'scene': 'T10SFF.2018190.v1.4_merged', 'burn_fraction': 0.0208, 'checkpoint_split': ['train'], 'sample_record': None, 'note': 'in the checkpoint train split: reproduction on a training scene, not generalisation'}
+{'scene': 'T10SGF.2020217.v1.4_merged', 'burn_fraction': 0.4168, 'checkpoint_split': ['train'], 'sample_record': None, 'note': 'in the checkpoint train split: reproduction on a training scene, not generalisation'}
+{'artifact': 'outputs/prithvi_burnscar_segmentation_adapter', 'format': 'org.valcorza.prithvi-burnscar-segmentation.adapter.v1', 'trainable': 'decoder', 'tensors': 34, 'bytes': 81276896, 'sha256': '181e924e58aeba50...'}
+{'reload_parity': {'positive_iou_diff': 0.0, 'metrics_identical': True, 'max_abs_score_diff': 0.0}, 'reloaded_best_epoch': 1}
+outputs/:
+  - outputs/prithvi_burnscar_segmentation_adapter/adapter.safetensors (79372.0 KB)
+  - outputs/prithvi_burnscar_segmentation_adapter/manifest.json (5.8 KB)
+  - outputs/prithvi_burnscar_segmentation_byod_example/pairs.csv (1.8 KB)
+  - outputs/prithvi_burnscar_segmentation_byod_example/test-000.mask.tif (512.3 KB)
+  - outputs/prithvi_burnscar_segmentation_byod_example/test-000_merged.tif (6144.4 KB)
+  - outputs/prithvi_burnscar_segmentation_byod_example/test-001.mask.tif (512.3 KB)
+  - outputs/prithvi_burnscar_segmentation_byod_example/test-001_merged.tif (6144.4 KB)
+  - outputs/prithvi_burnscar_segmentation_byod_example/test-002.mask.tif (512.3 KB)
+  - outputs/prithvi_burnscar_segmentation_byod_example/test-002_merged.tif (6144.4 KB)
+  - outputs/prithvi_burnscar_segmentation_byod_example/test-003.mask.tif (512.3 KB)
+  - outputs/prithvi_burnscar_segmentation_byod_example/test-003_merged.tif (6144.4 KB)
+  - outputs/prithvi_burnscar_segmentation_byod_example/test-004.mask.tif (512.3 KB)
+  - outputs/prithvi_burnscar_segmentation_byod_example/test-004_merged.tif (6144.4 KB)
+  - outputs/prithvi_burnscar_segmentation_byod_example/test-005.mask.tif (512.3 KB)
+  - outputs/prithvi_burnscar_segmentation_byod_example/test-005_merged.tif (6144.4 KB)
+  - outputs/prithvi_burnscar_segmentation_byod_example/test-006.mask.tif (512.3 KB)
+  - outputs/prithvi_burnscar_segmentation_byod_example/test-006_merged.tif (6144.4 KB)
+  - outputs/prithvi_burnscar_segmentation_evaluation_report.json (15.5 KB)
+  - outputs/prithvi_burnscar_segmentation_mask_T10SEH.2018190.v1.4_merged.tif (256.2 KB)
+  - outputs/prithvi_burnscar_segmentation_mask_T10SFF.2018190.v1.4_merged.tif (256.2 KB)
+  - outputs/prithvi_burnscar_segmentation_mask_T10SGF.2020217.v1.4_merged.tif (256.2 KB)
+  - outputs/prithvi_burnscar_segmentation_predictions.json (1.9 KB)
+  - outputs/prithvi_burnscar_segmentation_result.json (4.9 KB)
+  - outputs/prithvi_burnscar_segmentation_sample_chip.tif (6144.4 KB)
+  - outputs/prithvi_burnscar_segmentation_sample_label.tif (512.3 KB)
+  - outputs/prithvi_burnscar_segmentation_test_scenes.png (735.8 KB)
+[colab] Saving notebook with outputs to '/home/kurt/colab-runs/prithvi-burnscar-segmentation-pipeline-615e1bb-7384e1/prithvi_burnscar_segmentation_colab_615e1bb_colab-cli-t4_output.ipynb'...

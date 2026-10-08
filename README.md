@@ -70,7 +70,7 @@ Tests are offline: crafted pickles, temporary manifests, synthetic scenes, a syn
 
 ## Release status
 
-**Release-grade** — the `E2E` notebook blob `d8aa27bf` (committed at `f5d329c`) executed top-to-bottom in a clean Kaggle Tesla T4 runtime on 2026-09-25 (10/10 ok (1 restart after install cell), 430.8 s); the record is in `docs/release-verification.md` and `STATUS.md`. Static and unit checks — including the standalone generator parity checks — are necessary but were never the evidence; the hosted run is. A later change to the carried modules or the notebook returns the status to Candidate until re-verified.
+**Candidate** — the `E2E` tutorial was regenerated at `615e1bb` (blob `239a14f4`); that exact blob passed a Colab CLI 0.7.4 sequential execution on a fresh Colab Tesla T4 on 2026-10-08 (default path only) in one pass, no restart, 0 errors, 11/11 code cells, 374.1 s; held-out test burn-scar IoU 0.9251 frozen → 0.9263 adapted against a not-burned baseline of 0, reload parity exact. The record and byte-exact evidence are in `docs/release-verification.md` and `docs/execution-evidence/2026-10-08-615e1bb/`. The previous blob `d8aa27bf` (`f5d329c`) was recorded Release-grade on Kaggle T4 on 2026-09-25; that record is history and does not cover the current blob. Static and unit checks — including the standalone generator parity checks — are necessary but were never the evidence; the hosted run is.
 
 ## Licensing
 
