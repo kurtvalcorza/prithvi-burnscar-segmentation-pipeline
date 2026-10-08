@@ -636,15 +636,34 @@ def check_split_disjoint(splits: Mapping[str, Sequence[Mapping[str, Any]]]) -> d
     return {name: len(records) for name, records in splits.items()}
 
 
+def _split_counts(n: int, val_fraction: float, test_fraction: float) -> tuple[int, int]:
+    return max(1, round(n * test_fraction)), round(n * val_fraction)
+
+
+def byod_minimum_records(*, val_fraction: float = 0.2, test_fraction: float = 0.25) -> int:
+    """The smallest number of distinct labelled chips `split_dataset` accepts with these fractions: the split must
+    leave at least MIN_RECORDS training chips after the test and validation shares are taken (7 with the defaults,
+    not MIN_RECORDS itself; BS-m1)."""
+    n = MIN_RECORDS
+    while True:
+        n_test, n_val = _split_counts(n, val_fraction, test_fraction)
+        if n - n_test - n_val >= MIN_RECORDS:
+            return n
+        n += 1
+
+
 def split_dataset(
     records: Sequence[Mapping[str, Any]],
     *,
     val_fraction: float = 0.2,
     test_fraction: float = 0.25,
     seed: int = 0,
+    group_key: str = "group",
 ) -> dict[str, list[dict[str, Any]]]:
-    """Seeded shuffle of a BYOD dataset into train / validation / test after de-duplicating chips. Chips from one
-    fire or one tile are near-duplicates; group them yourself (one fire per split) when that matters."""
+    """Seeded split of a BYOD dataset into train / validation / test after de-duplicating chips. Chips from one fire
+    or one tile are near-duplicates, so when every record carries `group_key` (a fire or HLS tile id; the `group`
+    column of pairs.csv) whole groups are assigned to one role each and no group spans two roles (BS-m3, SPL5).
+    Without groups the shuffle is by chip and the result carries `grouped: False` in its `note`."""
     import random
 
     if not (0.0 <= val_fraction < 1.0 and 0.0 < test_fraction < 1.0 and val_fraction + test_fraction < 1.0):
@@ -658,12 +677,40 @@ def split_dataset(
             seen.add(key)
             unique.append(record)
     rng = random.Random(seed)
-    rng.shuffle(unique)
-    n_test = max(1, round(len(unique) * test_fraction))
-    n_val = round(len(unique) * val_fraction)
-    splits = {"test": unique[:n_test], "validation": unique[n_test : n_test + n_val], "train": unique[n_test + n_val :]}
+    n_test, n_val = _split_counts(len(unique), val_fraction, test_fraction)
+    groups = [str(r[group_key]) for r in unique if r.get(group_key) not in (None, "")]
+    if groups and len(groups) != len(unique):
+        raise ValueError(
+            f"{len(unique) - len(groups)} of {len(unique)} chips have no {group_key!r}; give every chip a group or none"
+        )
+    if groups:
+        by_group: dict[str, list[dict[str, Any]]] = {}
+        for record in unique:
+            by_group.setdefault(str(record[group_key]), []).append(record)
+        names = sorted(by_group)
+        rng.shuffle(names)
+        if len(names) < 3:
+            raise ValueError(
+                f"only {len(names)} distinct {group_key!r} value(s); at least 3 groups are needed for train, validation and test"
+            )
+        splits: dict[str, list[dict[str, Any]]] = {"test": [], "validation": [], "train": []}
+        for name in names:
+            if len(splits["test"]) < n_test:
+                splits["test"].extend(by_group[name])
+            elif len(splits["validation"]) < max(1, n_val):
+                splits["validation"].extend(by_group[name])
+            else:
+                splits["train"].extend(by_group[name])
+    else:
+        rng.shuffle(unique)
+        splits = {"test": unique[:n_test], "validation": unique[n_test : n_test + n_val], "train": unique[n_test + n_val :]}
     if len(splits["train"]) < MIN_RECORDS:
-        raise ValueError(f"split leaves {len(splits['train'])} training chips; at least {MIN_RECORDS} are required")
+        minimum = byod_minimum_records(val_fraction=val_fraction, test_fraction=test_fraction)
+        raise ValueError(
+            f"{len(unique)} distinct labelled chips split into {len(splits['test'])} test / {len(splits['validation'])} "
+            f"validation / {len(splits['train'])} training leave fewer than the {MIN_RECORDS} training chips adaptation "
+            f"needs: bring at least {minimum} chips" + (f" spread over enough {group_key!r} values" if groups else "")
+        )
     return splits
 
 
@@ -690,16 +737,37 @@ def load_byod_dataset(path: str | Path) -> list[dict[str, Any]]:
     missing = {"id", "image", "label"} - set(rows[0].keys() if rows else set())
     if missing:
         raise ValueError(f"pairs.csv is missing columns {sorted(missing)}")
+
+    def read(row_id: str, column: str, name: str, reader: Any) -> Any:
+        # BS-m1: a missing member or an undecodable file names the row, the file and the fix instead of a bare
+        # KeyError / TiffFileError.
+        try:
+            data = loader(name)
+        except (KeyError, FileNotFoundError):
+            raise ValueError(
+                f"pairs.csv row {row_id!r}: {column} file {name!r} is listed but not in the "
+                f"{'folder' if source.is_dir() else 'zip'}; add the file or fix the name in pairs.csv"
+            ) from None
+        target = Path(tmp) / f"{column}.tif"
+        target.write_bytes(data)
+        try:
+            return reader(target)
+        except Exception as exc:
+            raise ValueError(
+                f"pairs.csv row {row_id!r}: {column} file {name!r} is not a readable GeoTIFF "
+                f"({type(exc).__name__}: {str(exc)[:80]}); {column}s must be "
+                f"{'six-band 512 × 512' if column == 'image' else 'single-band 512 × 512'} TIFF files"
+            ) from None
+
     out = []
     with tempfile.TemporaryDirectory() as tmp:
         for row in rows:
-            image_path = Path(tmp) / "image.tif"
-            image_path.write_bytes(loader(row["image"]))
-            record: dict[str, Any] = {"id": row["id"], "image": read_chip(image_path)}
+            record: dict[str, Any] = {"id": row["id"], "image": read(row["id"], "image", row["image"], read_chip)}
             if row.get("label"):
-                label_path = Path(tmp) / "label.tif"
-                label_path.write_bytes(loader(row["label"]))
-                record["label"] = read_mask(label_path)
+                record["label"] = read(row["id"], "label", row["label"], read_mask)
+            if row.get("group"):  # BS-m3: an optional fire / tile id that split_dataset keeps inside one role
+                record["group"] = row["group"].strip()
+                record["region"] = record["group"]
             out.append(record)
     return out
 
@@ -717,23 +785,99 @@ def write_sample_pair(record: Mapping[str, Any], image_path: str | Path, label_p
     return {"image": str(image_out), "label": str(label_out)}
 
 
+def byod_file_names(record: Mapping[str, Any]) -> tuple[str, str]:
+    """The image and label file names a record is written under by `write_byod_example` and named by in
+    `write_dataset_csv` (`<id>_merged.tif`, `<id>.mask.tif`), so the exported table always matches written files."""
+    return f"{record['id']}_merged.tif", f"{record['id']}.mask.tif"
+
+
 def write_dataset_csv(records: Sequence[Mapping[str, Any]], path: str | Path) -> Path:
-    """Write the pairs table of a split (id, image, label, provenance) in the shape BYOD expects."""
+    """Write the pairs table of a split (id, image, label, group, source) in the shape BYOD expects: the file names
+    are those `write_byod_example` writes (BS-m4) and `group` is the HLS tile id (`region`) when the record has one,
+    which `split_dataset` keeps inside one role (BS-m3)."""
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["id", "image", "label", "region", "source"])
+        writer = csv.DictWriter(handle, fieldnames=["id", "image", "label", "group", "source"])
         writer.writeheader()
         for record in records:
+            image_name, label_name = byod_file_names(record)
             writer.writerow(
                 {
                     "id": record["id"],
-                    "image": f"{record.get('source_id', record['id'])}_merged.tif",
-                    "label": f"{record.get('source_id', record['id'])}.mask.tif",
-                    "region": record.get("region", ""),
+                    "image": image_name,
+                    "label": label_name,
+                    "group": record.get("group", record.get("region", "")),
                     "source": record.get("source", ""),
                 }
             )
+    return out
+
+
+def write_byod_example(records: Sequence[Mapping[str, Any]], folder: str | Path) -> dict[str, Any]:
+    """Write labelled records as a complete BYOD dataset — `pairs.csv` beside `<id>_merged.tif` / `<id>.mask.tif`
+    (float32 reflectance, int16 mask, no georeferencing) — that `load_byod_dataset` reads back as a folder or,
+    zipped, as an archive (BS-m4). Returns the folder, the file names and the number of pairs."""
+    out = Path(folder)
+    out.mkdir(parents=True, exist_ok=True)
+    names = []
+    for record in records:
+        image_name, label_name = byod_file_names(record)
+        write_sample_pair(record, out / image_name, out / label_name)
+        names.append({"id": record["id"], "image": image_name, "label": label_name})
+    csv_path = write_dataset_csv(records, out / "pairs.csv")
+    return {
+        "folder": str(out),
+        "pairs_csv": str(csv_path),
+        "n_pairs": len(names),
+        "files": names,
+        "minimum_chips": byod_minimum_records(),
+    }
+
+
+def example_provenance(path: str | Path, splits_dir: str | Path) -> dict[str, Any]:
+    """Where an upstream example scene really comes from (BS-m2): the scene key, the model repository's split files
+    that list it (`splits/{train,val,test}.txt`), and the pinned sample record whose image is byte-identical to it
+    (`sample_record` = `{key, role}`), so the notebook can say whether a scene is new, a sample test scene or a scene
+    the packaged checkpoint trained on."""
+    file = Path(path)
+    stem = file.name
+    for prefix in ("subsetted_512x512_HLS.S30.",):
+        if stem.startswith(prefix):
+            stem = stem[len(prefix) :]
+    key = stem.replace(".4_merged.tif", "").replace("_merged.tif", "").replace(".tif", "")
+    digest = _sha256_file(file)
+    listed = []
+    for split in ("train", "val", "test"):
+        split_file = Path(splits_dir) / f"{split}.txt"
+        if split_file.is_file() and key in split_file.read_text(encoding="utf-8").split():
+            listed.append(split)
+    identical = [{"key": name, "role": role} for name, role, _m, _b, sha, *_rest in SAMPLE_RECORDS if sha == digest]
+    return {
+        "scene": key,
+        "sha256": digest,
+        "upstream_split": listed,
+        "sample_record": identical[0] if identical else None,
+        "new_to_the_checkpoint": not listed,
+    }
+
+
+def false_colour_composite(image: Any) -> Any:
+    """An (H, W, 3) float32 display composite of a six-band chip — SWIR 2, narrow NIR, red — stretched per band to
+    the 2nd..98th percentile of the valid pixels, so burn scars (bright SWIR, dark NIR) stand out (BS-m6)."""
+    import numpy as np
+
+    array = np.asarray(image, dtype=np.float32)
+    if array.ndim != 3 or array.shape[0] != 6:
+        raise ValueError(f"expected a (6, H, W) chip, got {array.shape}")
+    if array.max() > 2.0:
+        array = array * 1e-4
+    out = np.zeros((array.shape[1], array.shape[2], 3), dtype=np.float32)
+    for channel, band in enumerate((5, 3, 2)):
+        plane = array[band]
+        valid = plane[np.isfinite(plane) & (plane > 0)]
+        low, high = (np.percentile(valid, (2, 98)) if valid.size else (0.0, 1.0))
+        out[..., channel] = np.clip((plane - low) / max(float(high - low), 1e-6), 0.0, 1.0)
     return out
 
 

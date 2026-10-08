@@ -66,6 +66,25 @@ def segmentation_metrics(predictions: Sequence[Any], labels: Sequence[Any]) -> d
     return metrics_from_confusion(confusion_matrix(predictions, labels))
 
 
+def per_chip_burn_iou(
+    predictions: Sequence[Any], labels: Sequence[Any], ids: Sequence[str] | None = None
+) -> list[dict[str, Any]]:
+    """The positive class's IoU chip by chip (BS-S4): the pooled numbers let large burns dominate, and this list shows
+    the spread. A chip with no burn pixel in label or prediction has `iou` None."""
+    out = []
+    for index, (pred, label) in enumerate(zip(predictions, labels, strict=True)):
+        metrics = metrics_from_confusion(confusion_matrix([pred], [label]))
+        out.append(
+            {
+                "id": ids[index] if ids is not None else index,
+                "iou": metrics["iou"][CLASS_NAMES[NUM_CLASSES - 1]],
+                "positive_fraction": metrics["positive_fraction"],
+                "labelled_pixels": metrics["labelled_pixels"],
+            }
+        )
+    return out
+
+
 def majority_baseline(labels: Sequence[Any]) -> dict[str, Any]:
     """The all-class-0 prediction scored on the same pixels: the number any model must beat on the positive class."""
     import numpy as np
