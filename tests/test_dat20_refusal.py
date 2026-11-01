@@ -254,6 +254,69 @@ def test_genuine_internal_error_keeps_its_traceback(monkeypatch, tmp_path):
     assert (tmp_path / "outputs" / f"{STEM}_result.json").exists()  # nothing is removed for an internal error
 
 
+# --- the catch is narrow: only bad input is refused; an internal TypeError/KeyError/OSError keeps its traceback ---------
+
+
+def test_the_byod_catch_is_narrow_in_the_notebook_source():
+    source = _cell(BYOD_CELL)
+    branch = source[source.index("try:\n    if USE_BYOD:\n") : source.index(WRAP_END) + len(WRAP_END)]
+    caught = [line.strip() for line in branch.splitlines() if line.strip().startswith("except ")]
+    assert caught == ["except ImportError:", "except (OSError, zipfile.BadZipFile) as exc:", "except TypeError as exc:", "except BYODRefusal as exc:", "except ValueError as exc:"], caught
+    assert "        try:\n            byod_records = load_byod_dataset(byod_path)\n        except (OSError, zipfile.BadZipFile) as exc:\n" in branch
+    assert "\nexcept BYODRefusal as exc:\n    refuse_byod(exc.file_name, exc.reason)\nexcept ValueError as exc:\n    if not USE_BYOD:\n        raise\n" in branch
+
+
+@pytest.mark.parametrize(
+    ("kind", "rule"),
+    [
+        ("folder without pairs.csv", "the dataset cannot be read (FileNotFoundError: "),
+        ("short row", "a pairs.csv row has fewer cells than the header (TypeError: "),
+    ],
+)
+def test_an_unreadable_or_malformed_dataset_is_still_one_refused_line(monkeypatch, tmp_path, kind, rule):
+    monkeypatch.setitem(sys.modules, "google.colab", None)
+    folder = tmp_path / "chips"
+    folder.mkdir()
+    if kind == "short row":
+        (folder / "pairs.csv").write_text("id,image,label\nc1\n", encoding="utf-8")
+    with pytest.raises(ValueError) as caught:
+        _section4(monkeypatch, tmp_path, str(folder))
+    line = _refusal_line(caught.value)
+    assert line.startswith(f"Refused: chips: {rule}"), line
+    assert sorted(p.name for p in (tmp_path / "outputs").iterdir()) == []
+
+
+@pytest.mark.parametrize("error", [TypeError("internal helper bug"), KeyError("internal key"), OSError("internal I/O bug")], ids=["TypeError", "KeyError", "OSError"])
+def test_an_internal_error_after_the_loader_keeps_its_traceback_and_clears_nothing(monkeypatch, tmp_path, error):
+    import traceback
+
+    monkeypatch.setitem(sys.modules, "google.colab", None)
+    (tmp_path / "chips").mkdir()
+
+    def broken_split(records, **kwargs):
+        raise error
+
+    extra = {"load_byod_dataset": lambda _path: [{"id": "c1", "group": "fire-1"}], "split_dataset": broken_split}
+    with pytest.raises(type(error)) as caught:
+        _section4(monkeypatch, tmp_path, str(tmp_path / "chips"), extra=extra)
+    assert caught.value is error and not getattr(caught.value, "dimer_refusal", False)
+    rendered = "".join(traceback.format_exception(caught.value))
+    assert rendered.startswith("Traceback") and "broken_split" in rendered and "Refused:" not in rendered
+    assert (tmp_path / "outputs" / f"{STEM}_result.json").exists()  # nothing is removed for an internal error
+
+
+def test_a_keyerror_inside_the_loader_is_not_turned_into_a_refusal(monkeypatch, tmp_path):
+    monkeypatch.setitem(sys.modules, "google.colab", None)
+    (tmp_path / "chips").mkdir()
+
+    def buggy_loader(_path):
+        raise KeyError("loader bug")
+
+    with pytest.raises(KeyError, match="loader bug") as caught:
+        _section4(monkeypatch, tmp_path, str(tmp_path / "chips"), extra={"load_byod_dataset": buggy_loader})
+    assert not getattr(caught.value, "dimer_refusal", False)
+
+
 def test_sample_path_errors_are_not_refusals(monkeypatch, tmp_path):
     def broken(*args, **kwargs):
         raise ValueError("pinned archive digest mismatch")
@@ -270,4 +333,4 @@ def test_scripted_refusal_input_is_the_real_etc_directory(monkeypatch, tmp_path)
     with pytest.raises(ValueError) as caught:
         _section4(monkeypatch, tmp_path, "/etc")
     line = _refusal_line(caught.value)
-    assert line.startswith("Refused: etc: FileNotFoundError: ") and "pairs.csv" in line
+    assert line.startswith("Refused: etc: the dataset cannot be read (FileNotFoundError: ") and "pairs.csv" in line
